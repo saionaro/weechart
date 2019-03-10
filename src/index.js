@@ -16,141 +16,159 @@ const colors = {
   GraphSeparator: "#ebf0f3"
 };
 
-let canvas;
-let context2d;
 let chartSet;
-const target = 4;
 
-const exclude = {};
-
-const fetchData = () =>
-  fetch("./chart_data.json")
-    .then(data => data.json())
-    .catch(console.log);
-
-const findExtremums = chartData => {
-  let max = -Infinity;
-  let min = Infinity;
-
-  for (let column of chartData.columns) {
-    const type = column[0];
-
-    if (isLine(chartData.types[type]) && !exclude[type]) {
-      for (let i = 1; i < column.length; i++) {
-        if (column[i] > max) {
-          max = column[i];
-        }
-        if (column[i] < min) {
-          min = column[i];
-        }
-      }
-    }
-  }
-
-  return { max, min };
-};
+const isLine = type => type === types.Line;
 
 const calculateVerticalRatio = maxValue =>
   maxValue > MAX_HEIGHT ? MAX_HEIGHT / maxValue : 1;
 
 const calculateHorisontalRatio = count => MAX_WIDTH / count;
 
-const clear = () => context2d.clearRect(0, 0, canvas.width, canvas.height);
+class Graph {
+  constructor(container, data) {
+    this._data = data;
+    this._canvas = document.createElement("canvas");
+    this._canvas.width = 1200;
+    this._canvas.height = 400;
+    this._context = this._canvas.getContext("2d");
+    this._container = container;
+    this._checkboxContainer = null;
+    this._state = {
+      exclude: {}
+    };
+    this._onChangeCheckbox = this._onChangeCheckbox.bind(this);
 
-const isLine = type => type === types.Line;
-
-const drawChart = chartData => {
-  context2d.lineWidth = 1;
-
-  const extremums = findExtremums(chartData);
-  const verticalRatio = calculateVerticalRatio(extremums.max);
-  const horisontalRatio = calculateHorisontalRatio(chartData.columns[0].length);
-
-  const lowestDot = extremums.min * verticalRatio;
-  const highestDot = extremums.max * verticalRatio;
-  const paddings = (MAX_HEIGHT - (highestDot - lowestDot)) / 2;
-  const delta = lowestDot - paddings;
-
-  if (VERBOSE) {
-    console.log("Vertical ratio: " + verticalRatio);
-    console.log("Horisontal ratio: " + horisontalRatio);
+    container.appendChild(this._canvas);
+    this._renderButtons();
+    this.render();
   }
 
-  context2d.beginPath();
-  context2d.strokeStyle = colors.GraphSeparator;
-
-  for (let i = 0; i < LINES_COUNT; i++) {
-    const shift = HEIGHT - i * STEP_SIZE;
-    context2d.moveTo(0, shift);
-    context2d.lineTo(WIDTH, shift);
+  clear() {
+    this._context.clearRect(0, 0, this._canvas.width, this._canvas.height);
   }
 
-  context2d.stroke();
-  context2d.restore();
-  context2d.closePath();
+  render() {
+    const { _context: context, _data: data } = this;
+    context.lineWidth = 1;
 
-  context2d.lineWidth = 2;
+    const extremums = this._findExtremums(data);
+    const verticalRatio = calculateVerticalRatio(extremums.max);
+    const horisontalRatio = calculateHorisontalRatio(data.columns[0].length);
 
-  for (let column of chartData.columns) {
-    const type = column[0];
+    const lowestDot = extremums.min * verticalRatio;
+    const highestDot = extremums.max * verticalRatio;
+    const paddings = (MAX_HEIGHT - (highestDot - lowestDot)) / 2;
+    const delta = lowestDot - paddings;
 
-    if (isLine(chartData.types[type]) && !exclude[type]) {
-      context2d.strokeStyle = chartData.colors[type];
+    if (VERBOSE) {
+      console.log("Vertical ratio: " + verticalRatio);
+      console.log("Horisontal ratio: " + horisontalRatio);
+    }
 
-      context2d.beginPath();
-      context2d.moveTo(0, delta + HEIGHT - column[1] * verticalRatio);
+    context.beginPath();
+    context.strokeStyle = colors.GraphSeparator;
 
-      for (let i = 2; i < column.length; i++) {
-        context2d.lineTo(
-          i * horisontalRatio,
-          delta + HEIGHT - column[i] * verticalRatio
-        );
+    for (let i = 0; i < LINES_COUNT; i++) {
+      const shift = HEIGHT - i * STEP_SIZE;
+      context.moveTo(0, shift);
+      context.lineTo(WIDTH, shift);
+    }
+
+    context.stroke();
+    context.restore();
+    context.closePath();
+
+    context.lineWidth = 2;
+
+    for (let column of data.columns) {
+      const type = column[0];
+
+      if (isLine(data.types[type]) && !this._state.exclude[type]) {
+        context.strokeStyle = data.colors[type];
+
+        context.beginPath();
+        context.moveTo(0, delta + HEIGHT - column[1] * verticalRatio);
+
+        for (let i = 2; i < column.length; i++) {
+          context.lineTo(
+            i * horisontalRatio,
+            delta + HEIGHT - column[i] * verticalRatio
+          );
+        }
+
+        context.stroke();
+        context.restore();
+        context.closePath();
       }
-
-      context2d.stroke();
-      context2d.restore();
-      context2d.closePath();
-    }
-  }
-};
-
-const renderButtons = chartData => {
-  let items = "";
-
-  for (let type in chartData.types) {
-    if (chartData.types[type] === types.Line) {
-      items += `<li class="charts-selector__item">
-        <label class="checkbox">
-          <input type="checkbox" class="checkbox__input visually-hidden" name="${type}" checked>
-          <span class="checkbox__title">${chartData.names[type]}</span>
-        </label>
-      </li>`;
     }
   }
 
-  const tempContainer = document.createElement("div");
-  tempContainer.innerHTML = `<ul class="charts-selector">${items}</ul>`;
+  _findExtremums() {
+    const { _data: data } = this;
+    let max = -Infinity;
+    let min = Infinity;
 
-  const li = tempContainer.children[0];
+    for (let column of data.columns) {
+      const type = column[0];
 
-  li.addEventListener("change", e => {
-    exclude[e.target.name] = !e.target.checked;
-    clear();
-    drawChart(chartSet[target]);
-  });
+      if (isLine(data.types[type]) && !this._state.exclude[type]) {
+        for (let i = 1; i < column.length; i++) {
+          if (column[i] > max) {
+            max = column[i];
+          }
+          if (column[i] < min) {
+            min = column[i];
+          }
+        }
+      }
+    }
 
-  document.body.appendChild(li);
-};
+    return { max, min };
+  }
+
+  _renderButtons() {
+    let items = "";
+    const { _data: data, _container: container } = this;
+
+    for (let type in data.types) {
+      if (data.types[type] === types.Line) {
+        items += `<li class="charts-selector__item">
+          <label class="checkbox">
+            <input type="checkbox" class="checkbox__input visually-hidden" name="${type}" checked>
+            <span class="checkbox__title">${data.names[type]}</span>
+          </label>
+        </li>`;
+      }
+    }
+
+    const tempContainer = document.createElement("div");
+    tempContainer.innerHTML = `<ul class="charts-selector">${items}</ul>`;
+    this._checkboxContainer = tempContainer.children[0];
+    this._checkboxContainer.addEventListener("change", this._onChangeCheckbox);
+    container.appendChild(this._checkboxContainer);
+  }
+
+  _onChangeCheckbox(event) {
+    this._state.exclude[event.target.name] = !event.target.checked;
+    this.clear();
+    this.render();
+  }
+}
 
 const onFetchData = data => {
   chartSet = data;
-  renderButtons(data[target]);
-  drawChart(chartSet[target]);
+  for (let i = 0; i < data.length; i++) {
+    new Graph(document.querySelector(`#graph-${i}`), data[i]);
+  }
 };
 
+const fetchData = () =>
+  fetch("./chart_data.json")
+    .then(data => data.json())
+    .catch(console.log);
+
 const bootUp = () => {
-  canvas = document.querySelector(".app__canvas");
-  context2d = canvas.getContext("2d");
   fetchData().then(onFetchData);
 };
 

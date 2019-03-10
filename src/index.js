@@ -96,6 +96,7 @@ class Chart {
     if (VERBOSE) {
       console.log("Vertical ratio: " + verticalRatio);
       console.log("Horisontal ratio: " + horisontalRatio);
+      console.log(extremums);
     }
 
     context.lineWidth = 1;
@@ -139,13 +140,16 @@ class Chart {
     context.lineWidth = 1;
     context.fillStyle = colors.ChartText;
 
-    for (let i = 0; i < LINES_COUNT; i++) {
-      const shift = HEIGHT - i * STEP_SIZE;
-      context.fillText(
-        Math.round(extremums.max * (i / LINES_COUNT)),
-        0,
-        shift - 5
-      );
+    if (extremums.max !== -Infinity) {
+      for (let i = 0; i < LINES_COUNT; i++) {
+        const shift = HEIGHT - i * STEP_SIZE;
+
+        context.fillText(
+          Math.round(extremums.max * (i / LINES_COUNT)),
+          0,
+          shift - 6
+        );
+      }
     }
   }
 

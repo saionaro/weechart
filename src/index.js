@@ -1,11 +1,19 @@
+const VERBOSE = true;
+
 const HEIGHT = 400;
 const WIDTH = 1200;
 const MAX_WIDTH = 1200;
 const MAX_HEIGHT = 390;
+const LINES_COUNT = 6;
+const STEP_SIZE = HEIGHT / LINES_COUNT;
 
 const types = {
   Line: "line",
   Date: "x"
+};
+
+const colors = {
+  GraphSeparator: "#ebf0f3"
 };
 
 let canvas;
@@ -27,7 +35,7 @@ const findExtremums = chartData => {
   for (let column of chartData.columns) {
     const type = column[0];
 
-    if (chartData.types[type] === types.Line && !exclude[type]) {
+    if (isLine(chartData.types[type]) && !exclude[type]) {
       for (let i = 1; i < column.length; i++) {
         if (column[i] > max) {
           max = column[i];
@@ -49,9 +57,10 @@ const calculateHorisontalRatio = count => MAX_WIDTH / count;
 
 const clear = () => context2d.clearRect(0, 0, canvas.width, canvas.height);
 
+const isLine = type => type === types.Line;
+
 const drawChart = chartData => {
-  // console.log(chartData);
-  context2d.lineWidth = 2;
+  context2d.lineWidth = 1;
 
   const extremums = findExtremums(chartData);
   const verticalRatio = calculateVerticalRatio(extremums.max);
@@ -59,22 +68,33 @@ const drawChart = chartData => {
 
   const lowestDot = extremums.min * verticalRatio;
   const highestDot = extremums.max * verticalRatio;
-
   const paddings = (MAX_HEIGHT - (highestDot - lowestDot)) / 2;
-
   const delta = lowestDot - paddings;
 
-  // debugger;
+  if (VERBOSE) {
+    console.log("Vertical ratio: " + verticalRatio);
+    console.log("Horisontal ratio: " + horisontalRatio);
+  }
 
-  // const horisontalShift =
+  context2d.beginPath();
+  context2d.strokeStyle = colors.GraphSeparator;
 
-  console.log("Vertical ratio: " + verticalRatio);
-  console.log("Horisontal ratio: " + horisontalRatio);
+  for (let i = 0; i < LINES_COUNT; i++) {
+    const shift = HEIGHT - i * STEP_SIZE;
+    context2d.moveTo(0, shift);
+    context2d.lineTo(WIDTH, shift);
+  }
+
+  context2d.stroke();
+  context2d.restore();
+  context2d.closePath();
+
+  context2d.lineWidth = 2;
 
   for (let column of chartData.columns) {
     const type = column[0];
 
-    if (chartData.types[type] === types.Line && !exclude[type]) {
+    if (isLine(chartData.types[type]) && !exclude[type]) {
       context2d.strokeStyle = chartData.colors[type];
 
       context2d.beginPath();

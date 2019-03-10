@@ -1,5 +1,6 @@
 const VERBOSE = true;
 
+const DATA_ENDPOINT = "./chart_data.json";
 const HEIGHT = 400;
 const WIDTH = 1200;
 const MAX_WIDTH = 1200;
@@ -8,6 +9,18 @@ const LINES_COUNT = 6;
 const SCALE_RATE = 0.9;
 const STEP_SIZE = HEIGHT / LINES_COUNT;
 const MAX_SCALED_HEIGHT = SCALE_RATE * MAX_HEIGHT;
+const PIXEL_RATIO = (() => {
+  const ctx = document.createElement("canvas").getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const bsr =
+    ctx.webkitBackingStorePixelRatio ||
+    ctx.mozBackingStorePixelRatio ||
+    ctx.msBackingStorePixelRatio ||
+    ctx.oBackingStorePixelRatio ||
+    ctx.backingStorePixelRatio ||
+    1;
+  return dpr / bsr;
+})();
 
 const types = {
   Line: "line",
@@ -15,7 +28,8 @@ const types = {
 };
 
 const colors = {
-  ChartSeparator: "#ebf0f3"
+  ChartSeparator: "#ebf0f3",
+  ChartText: "#94a2ab"
 };
 
 let chartSet;
@@ -34,14 +48,22 @@ const calculateVerticalRatio = maxValue => {
   }
 };
 
+const createHiDPICanvas = (w, h, ratio = PIXEL_RATIO) => {
+  const can = document.createElement("canvas");
+  can.width = w * ratio;
+  can.height = h * ratio;
+  can.style.width = `${w}px`;
+  can.style.height = `${h}px`;
+  can.getContext("2d").setTransform(ratio, 0, 0, ratio, 0, 0);
+  return can;
+};
+
 const calculateHorisontalRatio = count => MAX_WIDTH / count;
 
 class Chart {
   constructor(container, data) {
     this._data = data;
-    this._canvas = document.createElement("canvas");
-    this._canvas.width = 1200;
-    this._canvas.height = 400;
+    this._canvas = createHiDPICanvas(1200, 400);
     this._context = this._canvas.getContext("2d");
     this._container = container;
     this._checkboxContainer = null;
@@ -61,7 +83,6 @@ class Chart {
 
   _renderChart() {
     const { _context: context, _data: data } = this;
-    context.lineWidth = 1;
 
     const extremums = this._findExtremums(data);
     const verticalRatio = calculateVerticalRatio(extremums.max);
@@ -77,6 +98,7 @@ class Chart {
       console.log("Horisontal ratio: " + horisontalRatio);
     }
 
+    context.lineWidth = 1;
     context.beginPath();
     context.strokeStyle = colors.ChartSeparator;
 
@@ -112,6 +134,18 @@ class Chart {
         context.restore();
         context.closePath();
       }
+    }
+
+    context.lineWidth = 1;
+    context.fillStyle = colors.ChartText;
+
+    for (let i = 0; i < LINES_COUNT; i++) {
+      const shift = HEIGHT - i * STEP_SIZE;
+      context.fillText(
+        Math.round(extremums.max * (i / LINES_COUNT)),
+        0,
+        shift - 5
+      );
     }
   }
 
@@ -177,11 +211,12 @@ const onFetchData = data => {
     new Chart(chartContainer, data[i]);
     fragment.appendChild(chartContainer);
   }
+
   appContainer.appendChild(fragment);
 };
 
 const fetchData = () =>
-  fetch("./chart_data.json")
+  fetch(DATA_ENDPOINT)
     .then(data => data.json())
     .catch(console.log);
 

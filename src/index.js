@@ -5,7 +5,9 @@ const WIDTH = 1200;
 const MAX_WIDTH = 1200;
 const MAX_HEIGHT = 390;
 const LINES_COUNT = 6;
+const SCALE_RATE = 0.9;
 const STEP_SIZE = HEIGHT / LINES_COUNT;
+const MAX_SCALED_HEIGHT = SCALE_RATE * MAX_HEIGHT;
 
 const types = {
   Line: "line",
@@ -13,19 +15,28 @@ const types = {
 };
 
 const colors = {
-  GraphSeparator: "#ebf0f3"
+  ChartSeparator: "#ebf0f3"
 };
 
 let chartSet;
 
 const isLine = type => type === types.Line;
 
-const calculateVerticalRatio = maxValue =>
-  maxValue > MAX_HEIGHT ? MAX_HEIGHT / maxValue : 1;
+const calculateVerticalRatio = maxValue => {
+  if (maxValue > MAX_HEIGHT) {
+    return MAX_HEIGHT / maxValue;
+  } else {
+    if (maxValue < MAX_SCALED_HEIGHT) {
+      return MAX_SCALED_HEIGHT / maxValue;
+    } else {
+      return 1;
+    }
+  }
+};
 
 const calculateHorisontalRatio = count => MAX_WIDTH / count;
 
-class Graph {
+class Chart {
   constructor(container, data) {
     this._data = data;
     this._canvas = document.createElement("canvas");
@@ -41,14 +52,14 @@ class Graph {
 
     container.appendChild(this._canvas);
     this._renderButtons();
-    this.render();
+    this._renderChart();
   }
 
   clear() {
     this._context.clearRect(0, 0, this._canvas.width, this._canvas.height);
   }
 
-  render() {
+  _renderChart() {
     const { _context: context, _data: data } = this;
     context.lineWidth = 1;
 
@@ -67,7 +78,7 @@ class Graph {
     }
 
     context.beginPath();
-    context.strokeStyle = colors.GraphSeparator;
+    context.strokeStyle = colors.ChartSeparator;
 
     for (let i = 0; i < LINES_COUNT; i++) {
       const shift = HEIGHT - i * STEP_SIZE;
@@ -152,15 +163,21 @@ class Graph {
   _onChangeCheckbox(event) {
     this._state.exclude[event.target.name] = !event.target.checked;
     this.clear();
-    this.render();
+    this._renderChart();
   }
 }
 
 const onFetchData = data => {
   chartSet = data;
+  const appContainer = document.querySelector(".app");
+  const fragment = document.createDocumentFragment();
+
   for (let i = 0; i < data.length; i++) {
-    new Graph(document.querySelector(`#graph-${i}`), data[i]);
+    const chartContainer = document.createElement("div");
+    new Chart(chartContainer, data[i]);
+    fragment.appendChild(chartContainer);
   }
+  appContainer.appendChild(fragment);
 };
 
 const fetchData = () =>

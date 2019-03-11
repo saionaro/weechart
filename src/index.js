@@ -1,14 +1,8 @@
 const VERBOSE = true;
 
 const DATA_ENDPOINT = "./chart_data.json";
-const HEIGHT = 400;
-const WIDTH = 1200;
-const MAX_WIDTH = 1200;
-const MAX_HEIGHT = 390;
 const LINES_COUNT = 6;
 const SCALE_RATE = 0.9;
-const STEP_SIZE = HEIGHT / LINES_COUNT;
-const MAX_SCALED_HEIGHT = SCALE_RATE * MAX_HEIGHT;
 const PIXEL_RATIO = (() => {
   const ctx = document.createElement("canvas").getContext("2d");
   const dpr = window.devicePixelRatio || 1;
@@ -29,19 +23,22 @@ const types = {
 
 const colors = {
   ChartSeparator: "#ebf0f3",
-  ChartText: "#94a2ab"
+  ChartText: "#94a2ab",
+  MinimapBackground: "#f4f9fb"
 };
 
 let chartSet;
 
 const isLine = type => type === types.Line;
 
-const calculateVerticalRatio = maxValue => {
-  if (maxValue > MAX_HEIGHT) {
-    return MAX_HEIGHT / maxValue;
+const calculateVerticalRatio = (maxValue, height) => {
+  if (maxValue > height) {
+    return height / maxValue;
   } else {
-    if (maxValue < MAX_SCALED_HEIGHT) {
-      return MAX_SCALED_HEIGHT / maxValue;
+    const scaledHeight = SCALE_RATE * height;
+
+    if (maxValue < scaledHeight) {
+      return scaledHeight / maxValue;
     } else {
       return 1;
     }
@@ -49,22 +46,48 @@ const calculateVerticalRatio = maxValue => {
 };
 
 const createHiDPICanvas = (w, h, ratio = PIXEL_RATIO) => {
-  const can = document.createElement("canvas");
-  can.width = w * ratio;
-  can.height = h * ratio;
-  can.style.width = `${w}px`;
-  can.style.height = `${h}px`;
-  can.getContext("2d").setTransform(ratio, 0, 0, ratio, 0, 0);
-  return can;
+  const canvas = document.createElement("canvas");
+  canvas.width = w * ratio;
+  canvas.height = h * ratio;
+  canvas.style.width = `${w}px`;
+  canvas.style.height = `${h}px`;
+  canvas.getContext("2d").setTransform(ratio, 0, 0, ratio, 0, 0);
+  return canvas;
 };
 
-const calculateHorisontalRatio = count => MAX_WIDTH / count;
+const calculateHorisontalRatio = (count, width) => width / count;
+
+const findExtremums = (data, excludes) => {
+  let max = -Infinity;
+  let min = Infinity;
+
+  for (let column of data.columns) {
+    const type = column[0];
+
+    if (isLine(data.types[type]) && !excludes[type]) {
+      for (let i = 1; i < column.length; i++) {
+        if (column[i] > max) {
+          max = column[i];
+        }
+        if (column[i] < min) {
+          min = column[i];
+        }
+      }
+    }
+  }
+
+  return { max, min };
+};
 
 class Chart {
   constructor(container, data) {
     this._data = data;
-    this._canvas = createHiDPICanvas(1200, 400);
-    this._context = this._canvas.getContext("2d");
+
+    this._chartCanvas = createHiDPICanvas(1000, 400);
+    this._chartContext = this._chartCanvas.getContext("2d");
+    this._minimapCanvas = createHiDPICanvas(1000, 50);
+    this._minimapContext = this._minimapCanvas.getContext("2d");
+
     this._container = container;
     this._checkboxContainer = null;
     this._state = {
@@ -72,77 +95,68 @@ class Chart {
     };
     this._onChangeCheckbox = this._onChangeCheckbox.bind(this);
 
-    container.appendChild(this._canvas);
+    container.appendChild(this._chartCanvas);
+    container.appendChild(this._minimapCanvas);
+
+    this._render();
     this._renderButtons();
-    this._renderChart();
   }
 
-  clear() {
-    this._context.clearRect(0, 0, this._canvas.width, this._canvas.height);
+  _render() {
+    const extremums = findExtremums(this._data, this._state.exclude);
+
+    this._chartContext.lineWidth = 1;
+    this._renderAdditionalInfo(this._chartCanvas, extremums);
+    this._chartContext.lineWidth = 2;
+    this._renderChart(this._chartCanvas, extremums);
+    this._renderLabels(this._chartCanvas, extremums);
+
+    this._minimapContext.fillStyle = colors.MinimapBackground;
+    this._minimapContext.fillRect(
+      0,
+      0,
+      this._minimapCanvas.width,
+      this._minimapCanvas.height
+    );
+    this._renderChart(this._minimapCanvas, extremums);
   }
 
-  _renderChart() {
-    const { _context: context, _data: data } = this;
+  _clear(canvas) {
+    const context = canvas.getContext("2d");
+    context.clearRect(0, 0, canvas.width, canvas.height);
+  }
 
-    const extremums = this._findExtremums(data);
-    const verticalRatio = calculateVerticalRatio(extremums.max);
-    const horisontalRatio = calculateHorisontalRatio(data.columns[0].length);
+  _renderAdditionalInfo(canvas, extremums) {
+    const context = canvas.getContext("2d");
+    const scaledPixelsWidth = canvas.width / PIXEL_RATIO;
+    const scaledPixelsHeight = canvas.height / PIXEL_RATIO;
+    const stepSize = scaledPixelsHeight / LINES_COUNT;
 
-    const lowestDot = extremums.min * verticalRatio;
-    const highestDot = extremums.max * verticalRatio;
-    const paddings = (MAX_HEIGHT - (highestDot - lowestDot)) / 2;
-    const delta = lowestDot - paddings;
-
-    if (VERBOSE) {
-      console.log("Vertical ratio: " + verticalRatio);
-      console.log("Horisontal ratio: " + horisontalRatio);
-      console.log(extremums);
-    }
-
-    context.lineWidth = 1;
     context.beginPath();
     context.strokeStyle = colors.ChartSeparator;
 
     for (let i = 0; i < LINES_COUNT; i++) {
-      const shift = HEIGHT - i * STEP_SIZE;
+      const shift = scaledPixelsHeight - i * stepSize;
       context.moveTo(0, shift);
-      context.lineTo(WIDTH, shift);
+      context.lineTo(scaledPixelsWidth, shift);
     }
 
     context.stroke();
     context.restore();
     context.closePath();
+  }
 
-    context.lineWidth = 2;
-
-    for (let column of data.columns) {
-      const type = column[0];
-
-      if (isLine(data.types[type]) && !this._state.exclude[type]) {
-        context.strokeStyle = data.colors[type];
-
-        context.beginPath();
-        context.moveTo(0, delta + HEIGHT - column[1] * verticalRatio);
-
-        for (let i = 2; i < column.length; i++) {
-          context.lineTo(
-            i * horisontalRatio,
-            delta + HEIGHT - column[i] * verticalRatio
-          );
-        }
-
-        context.stroke();
-        context.restore();
-        context.closePath();
-      }
-    }
+  _renderLabels(canvas, extremums) {
+    const scaledPixelsHeight = canvas.height / PIXEL_RATIO;
+    const stepSize = scaledPixelsHeight / LINES_COUNT;
+    const context = canvas.getContext("2d");
 
     context.lineWidth = 1;
     context.fillStyle = colors.ChartText;
 
     if (extremums.max !== -Infinity) {
       for (let i = 0; i < LINES_COUNT; i++) {
-        const shift = HEIGHT - i * STEP_SIZE;
+        const shift = scaledPixelsHeight - i * stepSize;
 
         context.fillText(
           Math.round(extremums.max * (i / LINES_COUNT)),
@@ -153,27 +167,57 @@ class Chart {
     }
   }
 
-  _findExtremums() {
+  _renderChart(canvas, extremums) {
     const { _data: data } = this;
-    let max = -Infinity;
-    let min = Infinity;
+    const context = canvas.getContext("2d");
+
+    const scaledPixelsWidth = canvas.width / PIXEL_RATIO;
+    const scaledPixelsHeight = canvas.height / PIXEL_RATIO;
+
+    const verticalRatio = calculateVerticalRatio(
+      extremums.max,
+      scaledPixelsHeight
+    );
+    const horisontalRatio = calculateHorisontalRatio(
+      data.columns[0].length,
+      scaledPixelsWidth
+    );
+
+    const lowestDot = extremums.min * verticalRatio;
+    const highestDot = extremums.max * verticalRatio;
+    const paddings = (scaledPixelsHeight - (highestDot - lowestDot)) / 2;
+    const delta = lowestDot - paddings;
+
+    if (VERBOSE) {
+      console.log("Vertical ratio: " + verticalRatio);
+      console.log("Horisontal ratio: " + horisontalRatio);
+      console.log(extremums);
+    }
 
     for (let column of data.columns) {
       const type = column[0];
 
       if (isLine(data.types[type]) && !this._state.exclude[type]) {
-        for (let i = 1; i < column.length; i++) {
-          if (column[i] > max) {
-            max = column[i];
-          }
-          if (column[i] < min) {
-            min = column[i];
-          }
+        context.strokeStyle = data.colors[type];
+
+        context.beginPath();
+        context.moveTo(
+          0,
+          delta + scaledPixelsHeight - column[1] * verticalRatio
+        );
+
+        for (let i = 2; i < column.length; i++) {
+          context.lineTo(
+            i * horisontalRatio,
+            delta + scaledPixelsHeight - column[i] * verticalRatio
+          );
         }
+
+        context.stroke();
+        context.restore();
+        context.closePath();
       }
     }
-
-    return { max, min };
   }
 
   _renderButtons() {
@@ -198,10 +242,13 @@ class Chart {
     container.appendChild(this._checkboxContainer);
   }
 
+  _renderMinimap() {}
+
   _onChangeCheckbox(event) {
     this._state.exclude[event.target.name] = !event.target.checked;
-    this.clear();
-    this._renderChart();
+    this._clear(this._chartCanvas);
+    this._clear(this._minimapCanvas);
+    this._render();
   }
 }
 

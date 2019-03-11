@@ -1,3 +1,12 @@
+/**
+ * TODO
+ * * Correct labels when padding chart
+ * * Add dates labels
+ * * Add window-view
+ * * Add icons for checkboxies
+ * * (!) Add animations
+ */
+
 const VERBOSE = true;
 
 const DATA_ENDPOINT = "./chart_data.json";

@@ -35,10 +35,6 @@ html {
   display: flex;
 }
 
-.charts-selector__item {
-  /* display: inline-block; */
-}
-
 .charts-selector__item + .charts-selector__item {
   margin-left: 8px;
 }

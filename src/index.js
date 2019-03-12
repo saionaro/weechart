@@ -11,6 +11,7 @@ const VERBOSE = true;
 const DATA_ENDPOINT = "./chart_data.json";
 const LINES_COUNT = 6;
 const SCALE_RATE = 0.9;
+const HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
 const PIXEL_RATIO = (() => {
   const ctx = document.createElement("canvas").getContext("2d");
   const dpr = window.devicePixelRatio || 1;
@@ -60,6 +61,23 @@ const CheckedIcon = `<svg
 </svg>`;
 
 let chartSet;
+
+const hexToRgb = hex => {
+  const result = HEX_REGEX.exec(hex);
+
+  if (!result) {
+    return null;
+  }
+
+  return {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  };
+};
+
+const rgbToString = (rgb, alpha = 1) =>
+  `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
 
 const isLine = type => type === types.Line;
 
@@ -119,6 +137,12 @@ class Chart {
     this._chartContext = this._chartCanvas.getContext("2d");
     this._minimapCanvas = createHiDPICanvas(1000, 50);
     this._minimapContext = this._minimapCanvas.getContext("2d");
+
+    this._rgbColors = {};
+
+    for (let type in this._data.colors) {
+      this._rgbColors[type] = hexToRgb(this._data.colors[type]);
+    }
 
     this._container = container;
     this._checkboxContainer = null;
@@ -199,7 +223,7 @@ class Chart {
     }
   }
 
-  _renderChart(canvas, extremums) {
+  _renderChart(canvas, extremums, extraData = { shift: 0, alpha: 1 }) {
     const { _data: data } = this;
     const context = canvas.getContext("2d");
 
@@ -230,7 +254,10 @@ class Chart {
       const type = column[0];
 
       if (isLine(data.types[type]) && !this._state.exclude[type]) {
-        context.strokeStyle = data.colors[type];
+        context.strokeStyle = rgbToString(
+          this._rgbColors[type],
+          extraData.alpha
+        );
 
         context.beginPath();
         context.moveTo(
@@ -259,7 +286,9 @@ class Chart {
     for (let type in data.types) {
       if (data.types[type] === types.Line) {
         items += `<li class="charts-selector__item">
-          <label class="checkbox" style="color: ${data.colors[type]}">
+          <label class="checkbox" style="color: ${rgbToString(
+            this._rgbColors[type]
+          )}">
             <input type="checkbox" class="checkbox__input visually-hidden" name="${type}" checked>
             ${CheckedIcon}
             <span class="checkbox__title">${data.names[type]}</span>

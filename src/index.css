@@ -12,20 +12,22 @@ html {
 }
 
 .checkbox {
-  display: block;
+  display: flex;
+  align-items: center;
   border: 1px solid #e5ecf1;
-  padding: 4px 8px 4px 24px;
+  padding: 4px 8px 4px 4px;
   border-radius: 14px;
   cursor: pointer;
   color: #42484b;
 }
 
 .checkbox__title {
-  color: red;
+  color: #42484b;
+  margin-left: 8px;
 }
 
-.checkbox__input:checked + .checkbox__title {
-  color: black;
+.checkbox__input:not(:checked) + .checked-icon circle {
+  fill: white;
 }
 
 .charts-selector {

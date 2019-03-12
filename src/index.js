@@ -3,7 +3,6 @@
  * * Correct labels when padding chart
  * * Add dates labels
  * * Add window-view
- * * Add icons for checkboxies
  * * (!) Add animations
  */
 
@@ -35,6 +34,30 @@ const colors = {
   ChartText: "#94a2ab",
   MinimapBackground: "#f4f9fb"
 };
+
+const CheckedIcon = `<svg
+  class="checked-icon"
+  height="20"
+  width="20"
+  viewBox="0 0 40 40"
+>
+  <circle
+    cx="20"
+    cy="20"
+    r="17"
+    stroke="currentColor"
+    stroke-width="3"
+    fill="currentColor"
+  />
+  <polyline
+    points="13,22 18,27 27,17"
+    stroke-width="4"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+    stroke="white"
+    fill="none"
+  />
+</svg>`;
 
 let chartSet;
 
@@ -236,8 +259,9 @@ class Chart {
     for (let type in data.types) {
       if (data.types[type] === types.Line) {
         items += `<li class="charts-selector__item">
-          <label class="checkbox">
+          <label class="checkbox" style="color: ${data.colors[type]}">
             <input type="checkbox" class="checkbox__input visually-hidden" name="${type}" checked>
+            ${CheckedIcon}
             <span class="checkbox__title">${data.names[type]}</span>
           </label>
         </li>`;

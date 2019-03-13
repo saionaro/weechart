@@ -1,9 +1,8 @@
 /**
  * TODO
- * * Correct labels when padding chart
+ * * Fix paddings
  * * Add dates labels
  * * Add window-view
- * * (!) Add animations
  */
 
 const VERBOSE = true;
@@ -29,6 +28,13 @@ const types = {
   Line: "line",
   Date: "x"
 };
+
+const cavasType = {
+  Minimap: "minimap",
+  Chart: "chart"
+};
+
+const canvasTypesList = [cavasType.Minimap, cavasType.Chart];
 
 const colors = {
   ChartSeparator: "#ebf0f3",
@@ -129,21 +135,33 @@ const findExtremums = (data, excludes) => {
   return { max, min };
 };
 
-const createCanvasObject = (width, height) => ({
+const fuzzyAdd = (sum, number) => {
+  const result = sum + number;
+
+  if (sum > 0) {
+    return result < 0 ? 0 : result;
+  }
+  return result > 0 ? 0 : result;
+};
+
+const createCanvasObject = (type, width, height) => ({
   canvas: createHiDPICanvas(width, height),
   context: null,
   width,
-  height
+  height,
+  type
 });
 
 class Chart {
-  constructor(container, data) {
+  constructor(container, data, { w, h }) {
     this._data = data;
 
-    this._chart = createCanvasObject(1000, 400);
+    this._chart = createCanvasObject(cavasType.Chart, w, h);
+    this._chart.canvas.className = "chart__chart-canvas";
     this._chart.context = this._chart.canvas.getContext("2d");
 
-    this._minimap = createCanvasObject(1000, 50);
+    this._minimap = createCanvasObject(cavasType.Minimap, w, 50);
+    this._minimap.canvas.className = "chart__minimap-canvas";
     this._minimap.context = this._minimap.canvas.getContext("2d");
 
     this._rgbColors = {};
@@ -156,7 +174,10 @@ class Chart {
       if (isLine(this._data.types[type])) {
         this._rgbColors[type] = hexToRgb(this._data.colors[type]);
         this._transitions[type] = {
-          verticalRatioModifer: 0,
+          verticalRatioModifer: {
+            [cavasType.Minimap]: 0,
+            [cavasType.Chart]: 0
+          },
           oppacity: 1
         };
       }
@@ -243,7 +264,7 @@ class Chart {
     }
   }
 
-  _renderChart({ context, width, height }, extremums) {
+  _renderChart({ context, width, height, type: canvasType }, extremums) {
     const { _data: data } = this;
     const verticalRatio = calculateVerticalRatio(extremums.max, height);
     const horisontalRatio = calculateHorisontalRatio(
@@ -267,7 +288,9 @@ class Chart {
       const type = column[0];
 
       if (isLine(data.types[type])) {
-        const verticalModifer = this._transitions[type].verticalRatioModifer;
+        const verticalModifer = this._transitions[type].verticalRatioModifer[
+          canvasType
+        ];
         const verticalRatioFinal = verticalRatio + verticalModifer;
 
         context.strokeStyle = rgbToString(
@@ -322,8 +345,8 @@ class Chart {
       target.name,
       target.checked
     );
-    const delta = this._findVerticalRatioDelta(target.name, target.checked);
-    this._animations["_animateCharts"] = this._animateCharts(delta);
+    const deltas = this._findVerticalRatioDelta(target.name, target.checked);
+    this._animations["_animateCharts"] = this._animateCharts(deltas);
     this._animationLoop();
   }
 
@@ -331,38 +354,52 @@ class Chart {
     const oldExtremums = findExtremums(this._data, this._state.exclude);
     this._state.exclude[type] = !value;
     const newExtremums = findExtremums(this._data, this._state.exclude);
-    const scaledPixelsHeight = this._chart.canvas.height / PIXEL_RATIO;
-    const oldVerticalRatio = calculateVerticalRatio(
-      oldExtremums.max,
-      scaledPixelsHeight
-    );
-    const newVerticalRatio = calculateVerticalRatio(
-      newExtremums.max,
-      scaledPixelsHeight
-    );
-    const delta = newVerticalRatio - oldVerticalRatio;
 
-    return delta;
+    const deltas = {};
+
+    for (const canvasType of canvasTypesList) {
+      const { height } = this[`_${canvasType}`];
+      const oldVerticalRatio = calculateVerticalRatio(oldExtremums.max, height);
+      const newVerticalRatio = calculateVerticalRatio(newExtremums.max, height);
+      deltas[canvasType] = newVerticalRatio - oldVerticalRatio;
+    }
+    return deltas;
   }
 
-  _animateCharts(delta) {
-    const scaleStep = delta / 33;
+  _animateCharts(deltas) {
+    const steps = {};
+
+    for (let canvasType of canvasTypesList) {
+      steps[canvasType] = deltas[canvasType] / 22;
+    }
 
     for (let type in this._transitions) {
-      this._transitions[type].verticalRatioModifer = -delta;
+      for (let canvasType of canvasTypesList) {
+        this._transitions[type].verticalRatioModifer[canvasType] = -deltas[
+          canvasType
+        ];
+      }
     }
 
     return () => {
       console.log("animate");
-      for (let type in this._transitions) {
-        this._transitions[type].verticalRatioModifer += scaleStep;
 
-        if (
-          (this._transitions[type].verticalRatioModifer >= 0 && delta > 0) ||
-          (this._transitions[type].verticalRatioModifer <= 0 && delta < 0) ||
-          scaleStep === 0
-        ) {
-          delete this._animations["_animateCharts"];
+      for (let type in this._transitions) {
+        for (let canvasType of canvasTypesList) {
+          const record = this._transitions[type].verticalRatioModifer;
+
+          if (
+            (record[canvasType] >= 0 && deltas[canvasType] > 0) ||
+            (record[canvasType] <= 0 && deltas[canvasType] < 0) ||
+            steps[canvasType] === 0
+          ) {
+            delete this._animations["_animateCharts"];
+          } else {
+            record[canvasType] = fuzzyAdd(
+              record[canvasType],
+              steps[canvasType]
+            );
+          }
         }
       }
     };
@@ -372,10 +409,11 @@ class Chart {
     return () => {
       console.log("hide");
       const record = this._transitions[type];
-      record.oppacity += value ? 0.06 : -0.06;
+      record.oppacity += value ? 0.08 : -0.08;
 
       if ((record.oppacity <= 0 && !value) || (record.oppacity >= 1 && value)) {
         delete this._animations["_hideChart"];
+        record.oppacity = value ? 1 : 0;
       }
     };
   }
@@ -401,9 +439,13 @@ const onFetchData = data => {
   const appContainer = document.querySelector(".app");
   const fragment = document.createDocumentFragment();
 
+  const w = 800;
+  const h = 400;
+
   for (let i = 0; i < data.length; i++) {
     const chartContainer = document.createElement("div");
-    new Chart(chartContainer, data[i]);
+    chartContainer.className = "chart";
+    new Chart(chartContainer, data[i], { w, h });
     fragment.appendChild(chartContainer);
   }
 

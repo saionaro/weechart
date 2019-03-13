@@ -11,6 +11,26 @@ html {
   margin: -1px;
 }
 
+.app {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  padding: 64px;
+}
+
+.chart {
+  display: flex;
+  flex-direction: column;
+}
+
+.chart + .chart {
+  margin-top: 32px;
+}
+
+.chart__minimap-canvas {
+  margin-top: 16px;
+}
+
 .checkbox {
   display: flex;
   align-items: center;
@@ -35,6 +55,7 @@ html {
   padding: 0;
   margin: 0;
   display: flex;
+  margin-top: 16px;
 }
 
 .charts-selector__item + .charts-selector__item {

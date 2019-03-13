@@ -133,15 +133,42 @@ class Chart {
   constructor(container, data) {
     this._data = data;
 
-    this._chartCanvas = createHiDPICanvas(1000, 400);
-    this._chartContext = this._chartCanvas.getContext("2d");
-    this._minimapCanvas = createHiDPICanvas(1000, 50);
-    this._minimapContext = this._minimapCanvas.getContext("2d");
+    this._chart = {
+      canvas: createHiDPICanvas(1000, 400),
+      context: null,
+      width: null,
+      height: null
+    };
+
+    this._chart.context = this._chart.canvas.getContext("2d");
+    this._chart.width = this._chart.canvas.width / PIXEL_RATIO;
+    this._chart.height = this._chart.canvas.height / PIXEL_RATIO;
+
+    this._minimap = {
+      canvas: createHiDPICanvas(1000, 50),
+      context: null,
+      width: null,
+      height: null
+    };
+
+    this._minimap.context = this._minimap.canvas.getContext("2d");
+    this._minimap.width = this._minimap.canvas.width / PIXEL_RATIO;
+    this._minimap.height = this._minimap.canvas.height / PIXEL_RATIO;
 
     this._rgbColors = {};
+    this._transitions = {};
+    this._animations = [];
 
-    for (let type in this._data.colors) {
-      this._rgbColors[type] = hexToRgb(this._data.colors[type]);
+    for (let column of data.columns) {
+      const type = column[0];
+
+      if (isLine(this._data.types[type])) {
+        this._rgbColors[type] = hexToRgb(this._data.colors[type]);
+        this._transitions[type] = {
+          verticalRatioModifer: 0,
+          oppacity: 1
+        };
+      }
     }
 
     this._container = container;
@@ -150,9 +177,10 @@ class Chart {
       exclude: {}
     };
     this._onChangeCheckbox = this._onChangeCheckbox.bind(this);
+    this._animationLoop = this._animationLoop.bind(this);
 
-    container.appendChild(this._chartCanvas);
-    container.appendChild(this._minimapCanvas);
+    container.appendChild(this._chart.canvas);
+    container.appendChild(this._minimap.canvas);
 
     this._render();
     this._renderButtons();
@@ -160,21 +188,27 @@ class Chart {
 
   _render() {
     const extremums = findExtremums(this._data, this._state.exclude);
+    this._drawChart(extremums);
+    this._drawMinimap(extremums);
+  }
 
-    this._chartContext.lineWidth = 1;
-    this._renderAdditionalInfo(this._chartCanvas, extremums);
-    this._chartContext.lineWidth = 2;
-    this._renderChart(this._chartCanvas, extremums);
-    this._renderLabels(this._chartCanvas, extremums);
+  _drawChart(extremums) {
+    this._chart.context.lineWidth = 1;
+    this._renderAdditionalInfo(this._chart);
+    this._chart.context.lineWidth = 2;
+    this._renderChart(this._chart, extremums);
+    this._renderLabels(this._chart, extremums);
+  }
 
-    this._minimapContext.fillStyle = colors.MinimapBackground;
-    this._minimapContext.fillRect(
+  _drawMinimap(extremums) {
+    this._minimap.context.fillStyle = colors.MinimapBackground;
+    this._minimap.context.fillRect(
       0,
       0,
-      this._minimapCanvas.width,
-      this._minimapCanvas.height
+      this._minimap.canvas.width,
+      this._minimap.canvas.height
     );
-    this._renderChart(this._minimapCanvas, extremums);
+    this._renderChart(this._minimap, extremums);
   }
 
   _clear(canvas) {
@@ -182,19 +216,16 @@ class Chart {
     context.clearRect(0, 0, canvas.width, canvas.height);
   }
 
-  _renderAdditionalInfo(canvas, extremums) {
-    const context = canvas.getContext("2d");
-    const scaledPixelsWidth = canvas.width / PIXEL_RATIO;
-    const scaledPixelsHeight = canvas.height / PIXEL_RATIO;
-    const stepSize = scaledPixelsHeight / LINES_COUNT;
+  _renderAdditionalInfo({ context, width, height }) {
+    const stepSize = height / LINES_COUNT;
 
     context.beginPath();
     context.strokeStyle = colors.ChartSeparator;
 
     for (let i = 0; i < LINES_COUNT; i++) {
-      const shift = scaledPixelsHeight - i * stepSize;
+      const shift = height - i * stepSize;
       context.moveTo(0, shift);
-      context.lineTo(scaledPixelsWidth, shift);
+      context.lineTo(width, shift);
     }
 
     context.stroke();
@@ -202,17 +233,15 @@ class Chart {
     context.closePath();
   }
 
-  _renderLabels(canvas, extremums) {
-    const scaledPixelsHeight = canvas.height / PIXEL_RATIO;
-    const stepSize = scaledPixelsHeight / LINES_COUNT;
-    const context = canvas.getContext("2d");
+  _renderLabels({ context, height }, extremums) {
+    const stepSize = height / LINES_COUNT;
 
     context.lineWidth = 1;
     context.fillStyle = colors.ChartText;
 
     if (extremums.max !== -Infinity) {
       for (let i = 0; i < LINES_COUNT; i++) {
-        const shift = scaledPixelsHeight - i * stepSize;
+        const shift = height - i * stepSize;
 
         context.fillText(
           Math.round(extremums.max * (i / LINES_COUNT)),
@@ -223,26 +252,19 @@ class Chart {
     }
   }
 
-  _renderChart(canvas, extremums, extraData = { shift: 0, alpha: 1 }) {
+  _renderChart({ context, width, height }, extremums) {
     const { _data: data } = this;
-    const context = canvas.getContext("2d");
-
-    const scaledPixelsWidth = canvas.width / PIXEL_RATIO;
-    const scaledPixelsHeight = canvas.height / PIXEL_RATIO;
-
-    const verticalRatio = calculateVerticalRatio(
-      extremums.max,
-      scaledPixelsHeight
-    );
+    const verticalRatio = calculateVerticalRatio(extremums.max, height);
     const horisontalRatio = calculateHorisontalRatio(
       data.columns[0].length,
-      scaledPixelsWidth
+      width
     );
 
-    const lowestDot = extremums.min * verticalRatio;
-    const highestDot = extremums.max * verticalRatio;
-    const paddings = (scaledPixelsHeight - (highestDot - lowestDot)) / 2;
-    const delta = lowestDot - paddings;
+    // TODO paddings
+    // const lowestDot = extremums.min * verticalRatio;
+    // const highestDot = extremums.max * verticalRatio;
+    // const paddings = (scaledPixelsHeight - (highestDot - lowestDot)) / 2;
+    // const delta = 0; //lowestDot - paddings;
 
     if (VERBOSE) {
       console.log("Vertical ratio: " + verticalRatio);
@@ -253,22 +275,22 @@ class Chart {
     for (let column of data.columns) {
       const type = column[0];
 
-      if (isLine(data.types[type]) && !this._state.exclude[type]) {
+      if (isLine(data.types[type])) {
+        const verticalModifer = this._transitions[type].verticalRatioModifer;
+        const verticalRatioFinal = verticalRatio + verticalModifer;
+
         context.strokeStyle = rgbToString(
           this._rgbColors[type],
-          extraData.alpha
+          this._transitions[type].oppacity
         );
 
         context.beginPath();
-        context.moveTo(
-          0,
-          delta + scaledPixelsHeight - column[1] * verticalRatio
-        );
+        context.moveTo(0, height - column[1] * verticalRatioFinal);
 
         for (let i = 2; i < column.length; i++) {
           context.lineTo(
             i * horisontalRatio,
-            delta + scaledPixelsHeight - column[i] * verticalRatio
+            height - column[i] * verticalRatioFinal
           );
         }
 
@@ -304,13 +326,82 @@ class Chart {
     container.appendChild(this._checkboxContainer);
   }
 
-  _renderMinimap() {}
+  _onChangeCheckbox({ target }) {
+    this._animations["_hideChart"] = this._hideChart(
+      target.name,
+      target.checked
+    );
+    const delta = this._findVerticalRatioDelta(target.name, target.checked);
+    this._animations["_animateCharts"] = this._animateCharts(delta);
+    this._animationLoop();
+  }
 
-  _onChangeCheckbox(event) {
-    this._state.exclude[event.target.name] = !event.target.checked;
-    this._clear(this._chartCanvas);
-    this._clear(this._minimapCanvas);
-    this._render();
+  _findVerticalRatioDelta(type, value) {
+    const oldExtremums = findExtremums(this._data, this._state.exclude);
+    this._state.exclude[type] = !value;
+    const newExtremums = findExtremums(this._data, this._state.exclude);
+    const scaledPixelsHeight = this._chart.canvas.height / PIXEL_RATIO;
+    const oldVerticalRatio = calculateVerticalRatio(
+      oldExtremums.max,
+      scaledPixelsHeight
+    );
+    const newVerticalRatio = calculateVerticalRatio(
+      newExtremums.max,
+      scaledPixelsHeight
+    );
+    const delta = newVerticalRatio - oldVerticalRatio;
+
+    return delta;
+  }
+
+  _animateCharts(delta) {
+    const scaleStep = delta / 33;
+
+    for (let type in this._transitions) {
+      this._transitions[type].verticalRatioModifer = -delta;
+    }
+
+    return () => {
+      console.log("animate");
+      for (let type in this._transitions) {
+        this._transitions[type].verticalRatioModifer += scaleStep;
+
+        if (
+          (this._transitions[type].verticalRatioModifer >= 0 && delta > 0) ||
+          (this._transitions[type].verticalRatioModifer <= 0 && delta < 0) ||
+          scaleStep === 0
+        ) {
+          delete this._animations["_animateCharts"];
+        }
+      }
+    };
+  }
+
+  _hideChart(type, value) {
+    return () => {
+      console.log("hide");
+      const record = this._transitions[type];
+      record.oppacity += value ? 0.06 : -0.06;
+
+      if ((record.oppacity <= 0 && !value) || (record.oppacity >= 1 && value)) {
+        delete this._animations["_hideChart"];
+      }
+    };
+  }
+
+  _animationLoop() {
+    console.log("animation tick");
+    if (Object.keys(this._animations).length) {
+      for (let key in this._animations) {
+        this._animations[key].call(this);
+      }
+      this._clear(this._chart.canvas);
+      this._clear(this._minimap.canvas);
+      this._render();
+      window.requestAnimationFrame(this._animationLoop);
+    } else {
+      this._render();
+    }
   }
 }
 

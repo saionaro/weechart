@@ -129,31 +129,22 @@ const findExtremums = (data, excludes) => {
   return { max, min };
 };
 
+const createCanvasObject = (width, height) => ({
+  canvas: createHiDPICanvas(width, height),
+  context: null,
+  width,
+  height
+});
+
 class Chart {
   constructor(container, data) {
     this._data = data;
 
-    this._chart = {
-      canvas: createHiDPICanvas(1000, 400),
-      context: null,
-      width: null,
-      height: null
-    };
-
+    this._chart = createCanvasObject(1000, 400);
     this._chart.context = this._chart.canvas.getContext("2d");
-    this._chart.width = this._chart.canvas.width / PIXEL_RATIO;
-    this._chart.height = this._chart.canvas.height / PIXEL_RATIO;
 
-    this._minimap = {
-      canvas: createHiDPICanvas(1000, 50),
-      context: null,
-      width: null,
-      height: null
-    };
-
+    this._minimap = createCanvasObject(1000, 50);
     this._minimap.context = this._minimap.canvas.getContext("2d");
-    this._minimap.width = this._minimap.canvas.width / PIXEL_RATIO;
-    this._minimap.height = this._minimap.canvas.height / PIXEL_RATIO;
 
     this._rgbColors = {};
     this._transitions = {};

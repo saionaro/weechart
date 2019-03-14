@@ -1,16 +1,17 @@
 /**
  * TODO
- * * Fix paddings
+ * * Add paddings
  * * Add dates labels
- * * Add window-view
+ * * Add window-view scale
  */
 
-const VERBOSE = false;
+const VERBOSE = true;
 
 const DATA_ENDPOINT = "./chart_data.json";
 const LINES_COUNT = 6;
 const SCALE_RATE = 0.9;
 const MINIMAP_HEIGHT = 50;
+const INITIAL_X_SCALE = 10;
 const HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
 const PIXEL_RATIO = (() => {
   const ctx = document.createElement("canvas").getContext("2d");
@@ -191,11 +192,11 @@ class Chart {
     this._transitions = {
       [cavasType.Minimap]: {
         yRatioModifer: 0,
-        xRatioModifer: 0
+        xRatioModifer: 1
       },
       [cavasType.Chart]: {
         yRatioModifer: 0,
-        xRatioModifer: 0
+        xRatioModifer: INITIAL_X_SCALE
       },
       opacity: {},
       xShift: 0
@@ -217,7 +218,7 @@ class Chart {
       drag: {
         active: false,
         elem: null,
-        width: w / 10,
+        width: w / INITIAL_X_SCALE,
         downX: 0,
         deltaX: 0
       }
@@ -232,7 +233,7 @@ class Chart {
     fragment.appendChild(this._graph.canvas);
     fragment.appendChild(this._chart.canvas);
     fragment.appendChild(wrapper);
-    container.appendChild(fragment);
+    this._container.appendChild(fragment);
 
     this._onChangeCheckbox = this._onChangeCheckbox.bind(this);
     this._animationLoop = this._animationLoop.bind(this);
@@ -263,27 +264,27 @@ class Chart {
     this._animationLoop();
   }
 
-  _moveDrag(event) {
+  _moveDrag({ pageX, movementX }) {
     const { drag } = this._state;
 
     if (!drag.elem) {
       return;
     }
 
-    var moveX = event.pageX - drag.downX;
+    var moveX = pageX - drag.downX;
 
-    if (Math.abs(moveX) < 4) {
+    if (Math.abs(moveX) < 4 || movementX === 0) {
       return;
     }
 
-    const sum = drag.deltaX + event.movementX;
+    const sum = drag.deltaX + movementX;
     const maxPadding = this._minimap.width - drag.width;
     const val = sum < 0 ? 0 : sum > maxPadding ? maxPadding : sum;
     drag.elem.style.transform = `translateX(${val}px)`;
     drag.deltaX = val;
 
     const newShift = val / this._minimap.width;
-    this._animations["_animateHorisontal"] = this._animateHorisontal(
+    this._animations._animateHorisontal = this._animateHorisontal(
       this._transitions.xShift,
       newShift
     );
@@ -363,6 +364,7 @@ class Chart {
 
   _renderChart({ context, width, height, type: canvasType }, extremums) {
     const { _data: data, _transitions: transitions, _dataCount: count } = this;
+    const isChart = canvasType === cavasType.Chart;
     const yRatio = calculateVerticalRatio(extremums.max, height);
     const xRatio = calculateHorisontalRatio(data.columns[0].length, width);
 
@@ -385,20 +387,12 @@ class Chart {
     let xModifer = transitions[canvasType].xRatioModifer;
 
     const yRatioFinal = yRatio + yModifer;
-    let xRatioFinal;
+    const xRatioFinal = xRatio * xModifer;
 
-    if (canvasType === cavasType.Chart) {
-      xModifer = 10;
-      xRatioFinal = xRatio * xModifer;
-    } else {
-      xRatioFinal = xRatio + xModifer;
-    }
+    const xShift = -(count * xRatioFinal * transitions.xShift);
 
-    const xShift = transitions.xShift;
-
-    if (xShift && canvasType === cavasType.Chart) {
-      const shift = count * xRatioFinal * xShift;
-      context.translate(-shift, 0);
+    if (xShift && isChart) {
+      context.translate(xShift, 0);
     }
 
     for (let column of data.columns) {
@@ -411,7 +405,16 @@ class Chart {
         context.moveTo(0, height - column[1] * yRatioFinal);
 
         for (let i = 2; i < column.length; i++) {
-          context.lineTo(i * xRatioFinal, height - column[i] * yRatioFinal);
+          if (isChart && (i + 1) * xRatioFinal + xShift < 0) {
+            continue;
+          }
+
+          const x = i * xRatioFinal;
+          context.lineTo(x, height - column[i] * yRatioFinal);
+
+          if (x + xShift > width) {
+            break;
+          }
         }
 
         context.stroke();
@@ -430,7 +433,12 @@ class Chart {
           <label class="checkbox" style="color: ${rgbToString(
             this._rgbColors[type]
           )}">
-            <input type="checkbox" class="checkbox__input visually-hidden" name="${type}" checked>
+            <input
+              type="checkbox"
+              class="checkbox__input visually-hidden"
+              name="${type}"
+              checked
+            >
             ${CheckedIcon}
             <span class="checkbox__title">${data.names[type]}</span>
           </label>
@@ -450,12 +458,9 @@ class Chart {
   }
 
   _onChangeCheckbox({ target }) {
-    this._animations["_hideChart"] = this._hideChart(
-      target.name,
-      target.checked
-    );
+    this._animations._hideChart = this._hideChart(target.name, target.checked);
     const deltas = this._findVerticalRatioDelta(target.name, target.checked);
-    this._animations["_animateVertical"] = this._animateVertical(deltas);
+    this._animations._animateVertical = this._animateVertical(deltas);
     this._animationLoop();
   }
 
@@ -500,7 +505,7 @@ class Chart {
           (yModifer <= 0 && deltas[canvasType] < 0) ||
           steps[canvasType] === 0
         ) {
-          delete this._animations["_animateVertical"];
+          delete this._animations._animateVertical;
         } else {
           record.yRatioModifer = fuzzyAdd(yModifer, steps[canvasType]);
         }
@@ -518,9 +523,13 @@ class Chart {
       this._transitions.xShift += step;
       const xShift = this._transitions.xShift;
 
-      if ((step < 0 && xShift <= newVal) || (step > 0 && xShift >= newVal)) {
+      if (
+        (step < 0 && xShift <= newVal) ||
+        (step > 0 && xShift >= newVal) ||
+        step === 0
+      ) {
         this._transitions.xShift = newVal;
-        delete this._animations["_animateHorisontal"];
+        delete this._animations._animateHorisontal;
       }
     };
   }
@@ -528,13 +537,13 @@ class Chart {
   _hideChart(type, value) {
     return () => {
       if (VERBOSE) {
-        console.log("hide");
+        console.log("Hide chart");
       }
       const record = this._transitions.opacity;
       record[type] += value ? 0.08 : -0.08;
 
       if ((record[type] <= 0 && !value) || (record[type] >= 1 && value)) {
-        delete this._animations["_hideChart"];
+        delete this._animations._hideChart;
         record[type] = value ? 1 : 0;
       }
     };

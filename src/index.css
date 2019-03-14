@@ -19,6 +19,7 @@ html {
 }
 
 .chart {
+  position: relative;
   display: flex;
   flex-direction: column;
 }
@@ -27,8 +28,22 @@ html {
   margin-top: 32px;
 }
 
-.chart__minimap-canvas {
+.chart__minimap-wrapper {
+  display: flex;
   margin-top: 16px;
+  position: relative;
+}
+
+.chart__minimap-canvas {
+  /* margin-top: 16px; */
+}
+
+.chart__minimap-drugger {
+  position: absolute;
+  top: 0;
+  background-color: rgba(1, 1, 1, 0.2);
+  transition-duration: 0.1s;
+  transition-property: transform;
 }
 
 .checkbox {
@@ -56,6 +71,10 @@ html {
   margin: 0;
   display: flex;
   margin-top: 16px;
+}
+
+.chart__chart-canvas {
+  position: absolute;
 }
 
 .charts-selector__item + .charts-selector__item {

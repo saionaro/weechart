@@ -35,10 +35,9 @@ html {
 }
 
 .chart__minimap-canvas {
-  /* margin-top: 16px; */
 }
 
-.chart__minimap-drugger {
+.chart__minimap-dragger {
   position: absolute;
   top: 0;
   background-color: rgba(1, 1, 1, 0.2);

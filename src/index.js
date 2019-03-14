@@ -5,7 +5,7 @@
  * * Add window-view
  */
 
-const VERBOSE = true;
+const VERBOSE = false;
 
 const DATA_ENDPOINT = "./chart_data.json";
 const LINES_COUNT = 6;
@@ -107,13 +107,13 @@ const calculateVerticalRatio = (maxValue, height) => {
   }
 };
 
-const createHiDPICanvas = (w, h, ratio = PIXEL_RATIO) => {
+const createHiDPICanvas = (w, h) => {
   const canvas = document.createElement("canvas");
-  canvas.width = w * ratio;
-  canvas.height = h * ratio;
+  canvas.width = w * PIXEL_RATIO;
+  canvas.height = h * PIXEL_RATIO;
   canvas.style.width = `${w}px`;
   canvas.style.height = `${h}px`;
-  canvas.getContext("2d").setTransform(ratio, 0, 0, ratio, 0, 0);
+  canvas.getContext("2d").setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
   return canvas;
 };
 
@@ -160,7 +160,7 @@ const createCanvasObject = (type, width, height) => ({
 
 const createDragger = width => {
   const drugger = document.createElement("div");
-  drugger.className = "chart__minimap-drugger";
+  drugger.className = "chart__minimap-dragger";
   drugger.style.height = `${MINIMAP_HEIGHT}px`;
   drugger.style.width = `${width}px`;
   return drugger;
@@ -170,6 +170,7 @@ class Chart {
   constructor(container, data, { w, h }) {
     this._data = data;
     this._dataCount = data.columns[0].length - 1;
+    this._savedExtremums = null;
 
     this._chart = createCanvasObject(cavasType.Chart, w, h);
     this._chart.canvas.className = "chart__chart-canvas";
@@ -197,7 +198,7 @@ class Chart {
         xRatioModifer: 0
       },
       opacity: {},
-      xShift: 0.5
+      xShift: 0
     };
 
     for (let column of data.columns) {
@@ -214,54 +215,52 @@ class Chart {
     this._state = {
       exclude: {},
       drag: {
+        active: false,
         elem: null,
         width: w / 10,
         downX: 0,
-        downY: 0,
         deltaX: 0
       }
     };
+    const fragment = document.createDocumentFragment();
+    const wrapper = document.createElement("div");
+    const dragger = createDragger(this._state.drag.width);
+
+    wrapper.className = "chart__minimap-wrapper";
+    wrapper.appendChild(this._minimap.canvas);
+    wrapper.appendChild(dragger);
+    fragment.appendChild(this._graph.canvas);
+    fragment.appendChild(this._chart.canvas);
+    fragment.appendChild(wrapper);
+    container.appendChild(fragment);
+
     this._onChangeCheckbox = this._onChangeCheckbox.bind(this);
     this._animationLoop = this._animationLoop.bind(this);
     this._startDrag = this._startDrag.bind(this);
     this._moveDrag = this._moveDrag.bind(this);
     this._endDrag = this._endDrag.bind(this);
 
-    container.appendChild(this._graph.canvas);
-    container.appendChild(this._chart.canvas);
-
-    const wrapper = document.createElement("div");
-    wrapper.className = "chart__minimap-wrapper";
-    const dragger = createDragger(this._state.drag.width);
-
-    wrapper.appendChild(this._minimap.canvas);
-    wrapper.appendChild(dragger);
-
     dragger.addEventListener("mousedown", this._startDrag, listenerOpts);
     wrapper.addEventListener("mouseup", this._endDrag, listenerOpts);
     wrapper.addEventListener("mouseleave", this._endDrag, listenerOpts);
     wrapper.addEventListener("mousemove", this._moveDrag, listenerOpts);
 
-    container.appendChild(wrapper);
+    this._savedExtremums = findExtremums(this._data, this._state.exclude);
 
     this._render();
     this._renderButtons();
   }
 
   _startDrag(event) {
-    if (event.which !== 1) {
+    if (event.which !== 1 || !event.target) {
       return;
     }
 
-    var elem = event.target;
-
-    if (!elem) return;
-
     const { drag } = this._state;
-
-    drag.elem = elem;
+    drag.elem = event.target;
     drag.downX = event.pageX;
-    drag.downY = event.pageY;
+    drag.active = true;
+    this._animationLoop();
   }
 
   _moveDrag(event) {
@@ -279,21 +278,27 @@ class Chart {
 
     const sum = drag.deltaX + event.movementX;
     const maxPadding = this._minimap.width - drag.width;
-    let val = sum < 0 ? 0 : sum > maxPadding ? maxPadding : sum;
+    const val = sum < 0 ? 0 : sum > maxPadding ? maxPadding : sum;
     drag.elem.style.transform = `translateX(${val}px)`;
     drag.deltaX = val;
+
+    const newShift = val / this._minimap.width;
+    this._animations["_animateHorisontal"] = this._animateHorisontal(
+      this._transitions.xShift,
+      newShift
+    );
   }
 
   _endDrag() {
-    this._state.drag.elem = null;
-    this._state.drag.downX = 0;
-    this._state.drag.downY = 0;
+    const { drag } = this._state;
+    drag.elem = null;
+    drag.active = false;
+    drag.downX = 0;
   }
 
   _render() {
-    const extremums = findExtremums(this._data, this._state.exclude);
-    this._drawChart(extremums);
-    this._drawMinimap(extremums);
+    this._drawChart(this._savedExtremums);
+    this._drawMinimap(this._savedExtremums);
   }
 
   _drawChart(extremums) {
@@ -317,6 +322,7 @@ class Chart {
 
   _clear(canvas) {
     const context = canvas.getContext("2d");
+    context.setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
     context.clearRect(0, 0, canvas.width, canvas.height);
   }
 
@@ -333,7 +339,6 @@ class Chart {
     }
 
     context.stroke();
-    context.restore();
     context.closePath();
   }
 
@@ -376,15 +381,6 @@ class Chart {
       console.log(extremums);
     }
 
-    // const xShift = transitions.common.xShift;
-
-    // if (xShift && canvasType === cavasType.Chart) {
-    //   const shift = count * xRatioFinal * xShift;
-    //   context.translate(-shift, 0);
-    // }
-    // console.log(transitions);
-
-    // const transitions = this._transitions[type];
     const yModifer = transitions[canvasType].yRatioModifer;
     let xModifer = transitions[canvasType].xRatioModifer;
 
@@ -396,6 +392,13 @@ class Chart {
       xRatioFinal = xRatio * xModifer;
     } else {
       xRatioFinal = xRatio + xModifer;
+    }
+
+    const xShift = transitions.xShift;
+
+    if (xShift && canvasType === cavasType.Chart) {
+      const shift = count * xRatioFinal * xShift;
+      context.translate(-shift, 0);
     }
 
     for (let column of data.columns) {
@@ -452,12 +455,12 @@ class Chart {
       target.checked
     );
     const deltas = this._findVerticalRatioDelta(target.name, target.checked);
-    this._animations["_animateCharts"] = this._animateCharts(deltas);
+    this._animations["_animateVertical"] = this._animateVertical(deltas);
     this._animationLoop();
   }
 
   _findVerticalRatioDelta(type, value) {
-    const oldExtremums = findExtremums(this._data, this._state.exclude);
+    const oldExtremums = this._savedExtremums;
     this._state.exclude[type] = !value;
     const newExtremums = findExtremums(this._data, this._state.exclude);
 
@@ -469,10 +472,13 @@ class Chart {
       const newVerticalRatio = calculateVerticalRatio(newExtremums.max, height);
       deltas[canvasType] = newVerticalRatio - oldVerticalRatio;
     }
+
+    this._savedExtremums = newExtremums;
+
     return deltas;
   }
 
-  _animateCharts(deltas) {
+  _animateVertical(deltas) {
     const steps = {};
 
     for (let canvasType of chartTypesList) {
@@ -481,7 +487,9 @@ class Chart {
     }
 
     return () => {
-      console.log("animate");
+      if (VERBOSE) {
+        console.log("animate vertical");
+      }
 
       for (let canvasType of chartTypesList) {
         const record = this._transitions[canvasType];
@@ -492,7 +500,7 @@ class Chart {
           (yModifer <= 0 && deltas[canvasType] < 0) ||
           steps[canvasType] === 0
         ) {
-          delete this._animations["_animateCharts"];
+          delete this._animations["_animateVertical"];
         } else {
           record.yRatioModifer = fuzzyAdd(yModifer, steps[canvasType]);
         }
@@ -500,9 +508,28 @@ class Chart {
     };
   }
 
+  _animateHorisontal(oldVal, newVal) {
+    const step = (newVal - oldVal) / 16;
+
+    return () => {
+      if (VERBOSE) {
+        console.log("animate horisontal");
+      }
+      this._transitions.xShift += step;
+      const xShift = this._transitions.xShift;
+
+      if ((step < 0 && xShift <= newVal) || (step > 0 && xShift >= newVal)) {
+        this._transitions.xShift = newVal;
+        delete this._animations["_animateHorisontal"];
+      }
+    };
+  }
+
   _hideChart(type, value) {
     return () => {
-      console.log("hide");
+      if (VERBOSE) {
+        console.log("hide");
+      }
       const record = this._transitions.opacity;
       record[type] += value ? 0.08 : -0.08;
 
@@ -514,19 +541,20 @@ class Chart {
   }
 
   _animationLoop() {
-    console.log("animation tick");
-    this._clear(this._chart.canvas);
-    this._clear(this._graph.canvas);
-    this._clear(this._minimap.canvas);
+    if (VERBOSE) {
+      console.log("animation tick");
+    }
 
-    if (Object.keys(this._animations).length) {
+    if (Object.keys(this._animations).length || this._state.drag.active) {
       for (let key in this._animations) {
-        this._animations[key].call(this);
+        this._animations[key]();
       }
+      this._clear(this._chart.canvas);
+      this._clear(this._graph.canvas);
+      this._clear(this._minimap.canvas);
+
       this._render();
       window.requestAnimationFrame(this._animationLoop);
-    } else {
-      this._render();
     }
   }
 }

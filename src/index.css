@@ -38,11 +38,20 @@ html {
 }
 
 .chart__minimap-dragger {
+  display: flex;
   position: absolute;
   top: 0;
   background-color: rgba(1, 1, 1, 0.2);
-  transition-duration: 0.1s;
-  transition-property: transform;
+}
+
+.chart__minimap-dragger-arrow {
+  height: 100%;
+  width: 10px;
+  background-color: red;
+}
+
+.chart__minimap-dragger-arrow--right {
+  margin-left: auto;
 }
 
 .checkbox {

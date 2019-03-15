@@ -5,13 +5,14 @@
  * * Add window-view scale
  */
 
-const VERBOSE = true;
+const VERBOSE = false;
 
 const DATA_ENDPOINT = "./chart_data.json";
 const LINES_COUNT = 6;
 const SCALE_RATE = 0.9;
 const MINIMAP_HEIGHT = 50;
 const INITIAL_X_SCALE = 10;
+const ANIMATION_STEPS = 16;
 const HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
 const PIXEL_RATIO = (() => {
   const ctx = document.createElement("canvas").getContext("2d");
@@ -164,6 +165,17 @@ const createDragger = width => {
   drugger.className = "chart__minimap-dragger";
   drugger.style.height = `${MINIMAP_HEIGHT}px`;
   drugger.style.width = `${width}px`;
+
+  const arrowLeft = document.createElement("div");
+  arrowLeft.className =
+    "chart__minimap-dragger-arrow chart__minimap-dragger-arrow--left";
+  const arrowRight = document.createElement("div");
+  arrowRight.className =
+    "chart__minimap-dragger-arrow chart__minimap-dragger-arrow--right";
+
+  drugger.appendChild(arrowLeft);
+  drugger.appendChild(arrowRight);
+
   return drugger;
 };
 
@@ -217,6 +229,8 @@ class Chart {
       exclude: {},
       drag: {
         active: false,
+        resize: false,
+        dragger: null,
         elem: null,
         width: w / INITIAL_X_SCALE,
         downX: 0,
@@ -226,6 +240,7 @@ class Chart {
     const fragment = document.createDocumentFragment();
     const wrapper = document.createElement("div");
     const dragger = createDragger(this._state.drag.width);
+    this._state.drag.dragger = dragger;
 
     wrapper.className = "chart__minimap-wrapper";
     wrapper.appendChild(this._minimap.canvas);
@@ -252,12 +267,31 @@ class Chart {
     this._renderButtons();
   }
 
+  _changeDragWidth(delta) {
+    const { [cavasType.Chart]: record } = this._transitions;
+    const { drag } = this._state;
+    const changedWidth = drag.width + delta;
+    const deltaRatio = drag.width / changedWidth;
+    drag.width = changedWidth;
+    drag.dragger.style.width = `${changedWidth}px`;
+
+    this._animations._animateHorisontalScale = this._animateHorisontalScale(
+      record.xRatioModifer,
+      deltaRatio * record.xRatioModifer
+    );
+  }
+
   _startDrag(event) {
     if (event.which !== 1 || !event.target) {
       return;
     }
 
     const { drag } = this._state;
+
+    if (event.target.classList.contains("chart__minimap-dragger-arrow")) {
+      drag.resize = true;
+    }
+
     drag.elem = event.target;
     drag.downX = event.pageX;
     drag.active = true;
@@ -267,7 +301,7 @@ class Chart {
   _moveDrag({ pageX, movementX }) {
     const { drag } = this._state;
 
-    if (!drag.elem) {
+    if (!drag.active) {
       return;
     }
 
@@ -277,6 +311,12 @@ class Chart {
       return;
     }
 
+    if (drag.resize) {
+      return this._changeDragWidth(movementX);
+    }
+
+    // this._minimap.width - drag.width + movementX <= this._minimap.width - drag.width
+
     const sum = drag.deltaX + movementX;
     const maxPadding = this._minimap.width - drag.width;
     const val = sum < 0 ? 0 : sum > maxPadding ? maxPadding : sum;
@@ -284,7 +324,7 @@ class Chart {
     drag.deltaX = val;
 
     const newShift = val / this._minimap.width;
-    this._animations._animateHorisontal = this._animateHorisontal(
+    this._animations._animateHorisontalMove = this._animateHorisontalMove(
       this._transitions.xShift,
       newShift
     );
@@ -294,6 +334,7 @@ class Chart {
     const { drag } = this._state;
     drag.elem = null;
     drag.active = false;
+    drag.resize = false;
     drag.downX = 0;
   }
 
@@ -487,7 +528,7 @@ class Chart {
     const steps = {};
 
     for (let canvasType of chartTypesList) {
-      steps[canvasType] = deltas[canvasType] / 16;
+      steps[canvasType] = deltas[canvasType] / ANIMATION_STEPS;
       this._transitions[canvasType].yRatioModifer = -deltas[canvasType];
     }
 
@@ -513,12 +554,12 @@ class Chart {
     };
   }
 
-  _animateHorisontal(oldVal, newVal) {
-    const step = (newVal - oldVal) / 16;
+  _animateHorisontalMove(oldVal, newVal) {
+    const step = (newVal - oldVal) / ANIMATION_STEPS;
 
     return () => {
       if (VERBOSE) {
-        console.log("animate horisontal");
+        console.log("animate horisontal move");
       }
       this._transitions.xShift += step;
       const xShift = this._transitions.xShift;
@@ -529,7 +570,29 @@ class Chart {
         step === 0
       ) {
         this._transitions.xShift = newVal;
-        delete this._animations._animateHorisontal;
+        delete this._animations._animateHorisontalMove;
+      }
+    };
+  }
+
+  _animateHorisontalScale(oldVal, newVal) {
+    const step = (newVal - oldVal) / ANIMATION_STEPS;
+    const { [cavasType.Chart]: record } = this._transitions;
+    record.xRatioModifer = newVal;
+
+    return () => {
+      if (VERBOSE) {
+        console.log("animate horisontal scale");
+      }
+      record.xRatioModifer += step;
+
+      if (
+        (step < 0 && record.xRatioModifer <= newVal) ||
+        (step > 0 && record.xRatioModifer >= newVal) ||
+        step === 0
+      ) {
+        record.xRatioModifer = newVal;
+        delete this._animations._animateHorisontalScale;
       }
     };
   }

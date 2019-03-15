@@ -44,6 +44,9 @@ html {
   background-color: rgba(1, 1, 1, 0.2);
 }
 
+.chart__minimap-dragger--dragging {
+}
+
 .chart__minimap-dragger-arrow {
   height: 100%;
   width: 10px;

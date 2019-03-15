@@ -5,7 +5,7 @@
  * * Add window-view scale
  */
 
-const VERBOSE = false;
+const VERBOSE = true;
 
 const DATA_ENDPOINT = "./chart_data.json";
 const LINES_COUNT = 6;
@@ -225,14 +225,17 @@ class Chart {
 
     this._container = container;
     this._checkboxContainer = null;
+    const dragWidth = w / INITIAL_X_SCALE;
     this._state = {
       exclude: {},
       drag: {
         active: false,
         resize: false,
+        leftArrow: false,
         dragger: null,
         elem: null,
-        width: w / INITIAL_X_SCALE,
+        initialWidth: dragWidth,
+        width: dragWidth,
         downX: 0,
         deltaX: 0
       }
@@ -267,29 +270,22 @@ class Chart {
     this._renderButtons();
   }
 
-  _changeDragWidth(delta) {
-    const { [cavasType.Chart]: record } = this._transitions;
-    const { drag } = this._state;
-    const changedWidth = drag.width + delta;
-    const deltaRatio = drag.width / changedWidth;
-    drag.width = changedWidth;
-    drag.dragger.style.width = `${changedWidth}px`;
-
-    this._animations._animateHorisontalScale = this._animateHorisontalScale(
-      record.xRatioModifer,
-      deltaRatio * record.xRatioModifer
-    );
-  }
-
   _startDrag(event) {
     if (event.which !== 1 || !event.target) {
       return;
     }
 
     const { drag } = this._state;
+    const { classList } = event.target;
 
-    if (event.target.classList.contains("chart__minimap-dragger-arrow")) {
+    if (classList.contains("chart__minimap-dragger-arrow")) {
       drag.resize = true;
+
+      if (classList.contains("chart__minimap-dragger-arrow--left")) {
+        drag.leftArrow = true;
+      }
+    } else {
+      this._state.drag.dragger.classList += " chart__minimap-dragger--dragging";
     }
 
     drag.elem = event.target;
@@ -311,22 +307,55 @@ class Chart {
       return;
     }
 
+    const maxPadding = this._minimap.width - drag.width;
+
     if (drag.resize) {
+      if (drag.leftArrow) {
+        if (
+          drag.width - movementX < drag.initialWidth ||
+          drag.deltaX + movementX < 0
+        ) {
+          return;
+        }
+
+        const newVal = drag.deltaX + movementX;
+        const newShift = newVal / this._minimap.width;
+        drag.deltaX = newVal;
+        drag.dragger.style.transform = `translateX(${newVal}px)`;
+        this._transitions.xShift = newShift;
+
+        return this._changeDragWidth(-movementX);
+      }
+
+      if (
+        movementX + drag.width < drag.initialWidth ||
+        maxPadding < drag.deltaX + movementX
+      ) {
+        return;
+      }
+
       return this._changeDragWidth(movementX);
     }
 
-    // this._minimap.width - drag.width + movementX <= this._minimap.width - drag.width
-
     const sum = drag.deltaX + movementX;
-    const maxPadding = this._minimap.width - drag.width;
     const val = sum < 0 ? 0 : sum > maxPadding ? maxPadding : sum;
-    drag.elem.style.transform = `translateX(${val}px)`;
+    drag.dragger.style.transform = `translateX(${val}px)`;
     drag.deltaX = val;
 
-    const newShift = val / this._minimap.width;
-    this._animations._animateHorisontalMove = this._animateHorisontalMove(
-      this._transitions.xShift,
-      newShift
+    this._transitions.xShift = val / this._minimap.width;
+  }
+
+  _changeDragWidth(delta) {
+    const { [cavasType.Chart]: record } = this._transitions;
+    const { drag } = this._state;
+    const changedWidth = drag.width + delta;
+    const deltaRatio = drag.width / changedWidth;
+    drag.width = changedWidth;
+    drag.dragger.style.width = `${changedWidth}px`;
+
+    this._animations._animateHorisontalScale = this._animateHorisontalScale(
+      record.xRatioModifer,
+      deltaRatio * record.xRatioModifer
     );
   }
 
@@ -334,8 +363,10 @@ class Chart {
     const { drag } = this._state;
     drag.elem = null;
     drag.active = false;
+    drag.leftArrow = false;
     drag.resize = false;
     drag.downX = 0;
+    this._state.drag.dragger.classList = "chart__minimap-dragger";
   }
 
   _render() {
@@ -550,27 +581,6 @@ class Chart {
         } else {
           record.yRatioModifer = fuzzyAdd(yModifer, steps[canvasType]);
         }
-      }
-    };
-  }
-
-  _animateHorisontalMove(oldVal, newVal) {
-    const step = (newVal - oldVal) / ANIMATION_STEPS;
-
-    return () => {
-      if (VERBOSE) {
-        console.log("animate horisontal move");
-      }
-      this._transitions.xShift += step;
-      const xShift = this._transitions.xShift;
-
-      if (
-        (step < 0 && xShift <= newVal) ||
-        (step > 0 && xShift >= newVal) ||
-        step === 0
-      ) {
-        this._transitions.xShift = newVal;
-        delete this._animations._animateHorisontalMove;
       }
     };
   }

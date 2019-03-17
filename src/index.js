@@ -4,7 +4,6 @@
  * * Add dates labels
  * * Floating window
  * * Night-mode
- * * _pushAnimation
  */
 
 const VERBOSE = false;
@@ -363,9 +362,7 @@ class Chart {
     drag.deltaX = val;
 
     this._transitions.xShift = val / this._minimap.width;
-    this._animations._animateVertical = this._animateVertical(
-      this._findVerticalRatioDelta()
-    );
+    this._pushAnimation(this._animateVertical(this._findVerticalRatioDelta()));
   }
 
   _changeDragWidth(delta) {
@@ -376,9 +373,11 @@ class Chart {
     drag.width = changedWidth;
     drag.dragger.style.width = `${changedWidth}px`;
 
-    this._animations._animateHorisontalScale = this._animateHorisontalScale(
-      record.xRatioModifer,
-      deltaRatio * record.xRatioModifer
+    this._pushAnimation(
+      this._animateHorisontalScale(
+        record.xRatioModifer,
+        deltaRatio * record.xRatioModifer
+      )
     );
   }
 
@@ -480,8 +479,11 @@ class Chart {
     const { _transitions, _localExtremums, _globalExtremums } = this;
     const usedExtremums =
       type === cavasType.Chart ? _localExtremums : _globalExtremums;
-    const yRatio = calculateVerticalRatio(usedExtremums.max, height);
-    return yRatio + _transitions[type].yRatioModifer;
+
+    return (
+      calculateVerticalRatio(usedExtremums.max, height) +
+      _transitions[type].yRatioModifer
+    );
   }
 
   _renderChart(canvasParams, xParams) {
@@ -575,11 +577,14 @@ class Chart {
   }
 
   _onChangeCheckbox({ target }) {
-    this._animations._hideChart = this._hideChart(target.name, target.checked);
+    this._pushAnimation(this._animateHideChart(target.name, target.checked));
     this._state.exclude[target.name] = !target.checked;
-    const deltas = this._findVerticalRatioDelta();
-    this._animations._animateVertical = this._animateVertical(deltas);
+    this._pushAnimation(this._animateVertical(this._findVerticalRatioDelta()));
     this._animationLoop();
+  }
+
+  _pushAnimation(animation) {
+    this._animations[animation.tag] = animation.hook;
   }
 
   _findVerticalRatioDelta() {
@@ -592,14 +597,13 @@ class Chart {
 
     const oldExtremumsGlobal = this._globalExtremums;
     const newExtremumsGlobal = findExtremums(this._data, this._state.exclude);
-
     const deltas = {};
 
     for (const canvasType of chartTypesList) {
       const { height } = this[`_${canvasType}`];
       const isChart = canvasType === canvasType.Chart;
-      let extrOld = isChart ? oldExtremums : oldExtremumsGlobal;
-      let extrNew = isChart ? newExtremums : newExtremumsGlobal;
+      const extrOld = isChart ? oldExtremums : oldExtremumsGlobal;
+      const extrNew = isChart ? newExtremums : newExtremumsGlobal;
 
       const oldVerticalRatio = calculateVerticalRatio(extrOld.max, height);
       const newVerticalRatio = calculateVerticalRatio(extrNew.max, height);
@@ -613,6 +617,7 @@ class Chart {
   }
 
   _animateVertical(deltas) {
+    const tag = "_animateVertical";
     const steps = {};
 
     for (let canvasType of chartTypesList) {
@@ -620,62 +625,74 @@ class Chart {
       this._transitions[canvasType].yRatioModifer = -deltas[canvasType];
     }
 
-    return () => {
-      if (VERBOSE) {
-        console.log("animate vertical");
-      }
-
-      for (let canvasType of chartTypesList) {
-        const record = this._transitions[canvasType];
-        const yModifer = record.yRatioModifer;
-
-        if (
-          (yModifer >= 0 && deltas[canvasType] > 0) ||
-          (yModifer <= 0 && deltas[canvasType] < 0) ||
-          steps[canvasType] === 0
-        ) {
-          delete this._animations._animateVertical;
-        } else {
-          record.yRatioModifer = fuzzyAdd(yModifer, steps[canvasType]);
+    return {
+      hook: () => {
+        if (VERBOSE) {
+          console.log("animate vertical");
         }
-      }
+
+        for (let canvasType of chartTypesList) {
+          const record = this._transitions[canvasType];
+          const yModifer = record.yRatioModifer;
+
+          if (
+            (yModifer >= 0 && deltas[canvasType] > 0) ||
+            (yModifer <= 0 && deltas[canvasType] < 0) ||
+            steps[canvasType] === 0
+          ) {
+            delete this._animations[tag];
+          } else {
+            record.yRatioModifer = fuzzyAdd(yModifer, steps[canvasType]);
+          }
+        }
+      },
+      tag
     };
   }
 
   _animateHorisontalScale(oldVal, newVal) {
+    const tag = "_animateHorisontalScale";
     const step = (newVal - oldVal) / ANIMATION_STEPS;
     const { [cavasType.Chart]: record } = this._transitions;
     record.xRatioModifer = newVal;
 
-    return () => {
-      if (VERBOSE) {
-        console.log("animate horisontal scale");
-      }
-      record.xRatioModifer += step;
+    return {
+      hook: () => {
+        if (VERBOSE) {
+          console.log("animate horisontal scale");
+        }
+        record.xRatioModifer += step;
 
-      if (
-        (step < 0 && record.xRatioModifer <= newVal) ||
-        (step > 0 && record.xRatioModifer >= newVal) ||
-        step === 0
-      ) {
-        record.xRatioModifer = newVal;
-        delete this._animations._animateHorisontalScale;
-      }
+        if (
+          (step < 0 && record.xRatioModifer <= newVal) ||
+          (step > 0 && record.xRatioModifer >= newVal) ||
+          step === 0
+        ) {
+          record.xRatioModifer = newVal;
+          delete this._animations[tag];
+        }
+      },
+      tag
     };
   }
 
-  _hideChart(type, value) {
-    return () => {
-      if (VERBOSE) {
-        console.log("Hide chart");
-      }
-      const record = this._transitions.opacity;
-      record[type] += value ? 0.08 : -0.08;
+  _animateHideChart(type, value) {
+    const tag = "_animateHideChart";
 
-      if ((record[type] <= 0 && !value) || (record[type] >= 1 && value)) {
-        delete this._animations._hideChart;
-        record[type] = value ? 1 : 0;
-      }
+    return {
+      hook: () => {
+        if (VERBOSE) {
+          console.log("Hide chart");
+        }
+        const record = this._transitions.opacity;
+        record[type] += value ? 0.08 : -0.08;
+
+        if ((record[type] <= 0 && !value) || (record[type] >= 1 && value)) {
+          delete this._animations[tag];
+          record[type] = value ? 1 : 0;
+        }
+      },
+      tag
     };
   }
 

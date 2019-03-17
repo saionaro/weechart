@@ -2,14 +2,16 @@
  * TODO
  * * Add paddings
  * * Add dates labels
- * * Add window-view scale
+ * * Floating window
+ * * Night-mode
+ * * _pushAnimation
  */
 
-const VERBOSE = true;
+const VERBOSE = false;
 
 const DATA_ENDPOINT = "./chart_data.json";
 const LINES_COUNT = 6;
-const SCALE_RATE = 0.9;
+const SCALE_RATE = 1;
 const MINIMAP_HEIGHT = 50;
 const INITIAL_X_SCALE = 10;
 const ANIMATION_STEPS = 16;
@@ -40,6 +42,11 @@ const cavasType = {
   Minimap: "minimap",
   Chart: "chart",
   Graph: "graph"
+};
+
+const extremumType = {
+  Local: "local",
+  Global: "global"
 };
 
 const chartTypesList = [cavasType.Minimap, cavasType.Chart];
@@ -109,6 +116,8 @@ const calculateVerticalRatio = (maxValue, height) => {
   }
 };
 
+const calculateHorisontalRatio = (count, width) => width / count;
+
 const createHiDPICanvas = (w, h) => {
   const canvas = document.createElement("canvas");
   canvas.width = w * PIXEL_RATIO;
@@ -119,17 +128,22 @@ const createHiDPICanvas = (w, h) => {
   return canvas;
 };
 
-const calculateHorisontalRatio = (count, width) => width / count;
-
-const findExtremums = (data, excludes) => {
+const findExtremums = (data, excludes, range) => {
   let max = -Infinity;
   let min = Infinity;
+  let from = 1;
+  let to = data.columns[0].length;
+
+  if (range) {
+    from = range[0] + 1;
+    to = range[1] + 1;
+  }
 
   for (let column of data.columns) {
     const type = column[0];
 
     if (isLine(data.types[type]) && !excludes[type]) {
-      for (let i = 1; i < column.length; i++) {
+      for (let i = from; i < to; i++) {
         if (column[i] > max) {
           max = column[i];
         }
@@ -183,7 +197,7 @@ class Chart {
   constructor(container, data, { w, h }) {
     this._data = data;
     this._dataCount = data.columns[0].length - 1;
-    this._savedExtremums = null;
+    this._localExtremums = null;
 
     this._chart = createCanvasObject(cavasType.Chart, w, h);
     this._chart.canvas.className = "chart__chart-canvas";
@@ -264,7 +278,13 @@ class Chart {
     wrapper.addEventListener("mouseleave", this._endDrag, listenerOpts);
     wrapper.addEventListener("mousemove", this._moveDrag, listenerOpts);
 
-    this._savedExtremums = findExtremums(this._data, this._state.exclude);
+    this._localExtremums = findExtremums(
+      this._data,
+      this._state.exclude,
+      this._getHorisontalParams(this._chart).window
+    );
+
+    this._globalExtremums = findExtremums(this._data, this._state.exclude);
 
     this._render();
     this._renderButtons();
@@ -343,6 +363,9 @@ class Chart {
     drag.deltaX = val;
 
     this._transitions.xShift = val / this._minimap.width;
+    this._animations._animateVertical = this._animateVertical(
+      this._findVerticalRatioDelta()
+    );
   }
 
   _changeDragWidth(delta) {
@@ -370,19 +393,19 @@ class Chart {
   }
 
   _render() {
-    this._drawChart(this._savedExtremums);
-    this._drawMinimap(this._savedExtremums);
+    this._drawChart();
+    this._drawMinimap();
   }
 
-  _drawChart(extremums) {
+  _drawChart() {
     this._chart.context.lineWidth = 1;
     this._renderAdditionalInfo(this._graph);
     this._chart.context.lineWidth = 2;
-    this._renderChart(this._chart, extremums);
-    this._renderLabels(this._graph, extremums);
+    this._renderChart(this._chart, this._getHorisontalParams(this._chart));
+    this._renderLabels(this._graph);
   }
 
-  _drawMinimap(extremums) {
+  _drawMinimap() {
     this._minimap.context.fillStyle = colors.MinimapBackground;
     this._minimap.context.fillRect(
       0,
@@ -390,7 +413,7 @@ class Chart {
       this._minimap.canvas.width,
       this._minimap.canvas.height
     );
-    this._renderChart(this._minimap, extremums);
+    this._renderChart(this._minimap, this._getHorisontalParams(this._minimap));
   }
 
   _clear(canvas) {
@@ -415,7 +438,8 @@ class Chart {
     context.closePath();
   }
 
-  _renderLabels({ context, height }, extremums) {
+  _renderLabels({ context, height }) {
+    const { _localExtremums: extremums } = this;
     const stepSize = height / LINES_COUNT;
 
     context.lineWidth = 1;
@@ -424,7 +448,6 @@ class Chart {
     if (extremums.max !== -Infinity) {
       for (let i = 0; i < LINES_COUNT; i++) {
         const shift = height - i * stepSize;
-
         context.fillText(
           Math.round(extremums.max * (i / LINES_COUNT)),
           0,
@@ -434,11 +457,37 @@ class Chart {
     }
   }
 
-  _renderChart({ context, width, height, type: canvasType }, extremums) {
-    const { _data: data, _transitions: transitions, _dataCount: count } = this;
+  _getHorisontalParams({ width, type }) {
+    const { _transitions: transitions, _dataCount: count } = this;
+    const xRatio = calculateHorisontalRatio(count, width);
+    const scale = xRatio * transitions[type].xRatioModifer;
+
+    const params = {
+      scale,
+      shift: -(count * scale * transitions.xShift),
+      window: []
+    };
+
+    const start = Math.round(-params.shift / params.scale) - 1;
+
+    params.window[0] = start < 0 ? 0 : start;
+    params.window[1] = Math.round((width - params.shift) / params.scale);
+
+    return params;
+  }
+
+  _getVerticalParams({ height, type }) {
+    const { _transitions, _localExtremums, _globalExtremums } = this;
+    const usedExtremums =
+      type === cavasType.Chart ? _localExtremums : _globalExtremums;
+    const yRatio = calculateVerticalRatio(usedExtremums.max, height);
+    return yRatio + _transitions[type].yRatioModifer;
+  }
+
+  _renderChart(canvasParams, xParams) {
+    const { context, width, height, type: canvasType } = canvasParams;
+    const { _data: data, _transitions: transitions } = this;
     const isChart = canvasType === cavasType.Chart;
-    const yRatio = calculateVerticalRatio(extremums.max, height);
-    const xRatio = calculateHorisontalRatio(data.columns[0].length, width);
 
     // full = 1200
     // 10% => 120
@@ -449,19 +498,15 @@ class Chart {
     // const paddings = (scaledPixelsHeight - (highestDot - lowestDot)) / 2;
     // const delta = 0; //lowestDot - paddings;
 
-    if (VERBOSE) {
-      console.log("Vertical ratio: " + yRatio);
-      console.log("Horisontal ratio: " + xRatio);
-      console.log(extremums);
-    }
+    // if (VERBOSE) {
+    //   console.log("Vertical ratio: " + yRatio);
+    //   console.log("Horisontal ratio: " + xRatio);
+    //   console.log(extremums);
+    // }
 
-    const yModifer = transitions[canvasType].yRatioModifer;
-    let xModifer = transitions[canvasType].xRatioModifer;
-
-    const yRatioFinal = yRatio + yModifer;
-    const xRatioFinal = xRatio * xModifer;
-
-    const xShift = -(count * xRatioFinal * transitions.xShift);
+    const yScale = this._getVerticalParams(canvasParams);
+    const xScale = xParams.scale;
+    const xShift = xParams.shift;
 
     if (xShift && isChart) {
       context.translate(xShift, 0);
@@ -474,17 +519,17 @@ class Chart {
       if (isLine(data.types[type]) && opacity !== 0) {
         context.beginPath();
         context.strokeStyle = rgbToString(this._rgbColors[type], opacity);
-        context.moveTo(0, height - column[1] * yRatioFinal);
+        context.moveTo(0, height - column[1] * yScale);
 
         for (let i = 2; i < column.length; i++) {
-          if (isChart && (i + 1) * xRatioFinal + xShift < 0) {
+          if (isChart && (i + 1) * xScale + xShift < 0) {
             continue;
           }
 
-          const x = i * xRatioFinal;
-          context.lineTo(x, height - column[i] * yRatioFinal);
+          const x = i * xScale;
+          context.lineTo(x, height - column[i] * yScale);
 
-          if (x + xShift > width) {
+          if (isChart && x + xShift > width) {
             break;
           }
         }
@@ -531,26 +576,38 @@ class Chart {
 
   _onChangeCheckbox({ target }) {
     this._animations._hideChart = this._hideChart(target.name, target.checked);
-    const deltas = this._findVerticalRatioDelta(target.name, target.checked);
+    this._state.exclude[target.name] = !target.checked;
+    const deltas = this._findVerticalRatioDelta();
     this._animations._animateVertical = this._animateVertical(deltas);
     this._animationLoop();
   }
 
-  _findVerticalRatioDelta(type, value) {
-    const oldExtremums = this._savedExtremums;
-    this._state.exclude[type] = !value;
-    const newExtremums = findExtremums(this._data, this._state.exclude);
+  _findVerticalRatioDelta() {
+    const oldExtremums = this._localExtremums;
+    const newExtremums = findExtremums(
+      this._data,
+      this._state.exclude,
+      this._getHorisontalParams(this._chart).window
+    );
+
+    const oldExtremumsGlobal = this._globalExtremums;
+    const newExtremumsGlobal = findExtremums(this._data, this._state.exclude);
 
     const deltas = {};
 
     for (const canvasType of chartTypesList) {
       const { height } = this[`_${canvasType}`];
-      const oldVerticalRatio = calculateVerticalRatio(oldExtremums.max, height);
-      const newVerticalRatio = calculateVerticalRatio(newExtremums.max, height);
+      const isChart = canvasType === canvasType.Chart;
+      let extrOld = isChart ? oldExtremums : oldExtremumsGlobal;
+      let extrNew = isChart ? newExtremums : newExtremumsGlobal;
+
+      const oldVerticalRatio = calculateVerticalRatio(extrOld.max, height);
+      const newVerticalRatio = calculateVerticalRatio(extrNew.max, height);
       deltas[canvasType] = newVerticalRatio - oldVerticalRatio;
     }
 
-    this._savedExtremums = newExtremums;
+    this._localExtremums = newExtremums;
+    this._globalExtremums = newExtremumsGlobal;
 
     return deltas;
   }

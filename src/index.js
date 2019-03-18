@@ -78,15 +78,14 @@ const _$TelegramCharts = {
   }
 };
 
-const types = {
+const dataTypes = {
   Line: "line",
   Date: "x"
 };
 
 const cavasType = {
   Minimap: "minimap",
-  Chart: "chart",
-  Graph: "graph"
+  Chart: "chart"
 };
 
 const extremumType = {
@@ -138,9 +137,7 @@ const CheckedIcon = `<svg
 const hexToRgb = hex => {
   const result = HEX_REGEX.exec(hex);
 
-  if (!result) {
-    return null;
-  }
+  if (!result) return null;
 
   return {
     r: parseInt(result[1], 16),
@@ -152,7 +149,7 @@ const hexToRgb = hex => {
 const rgbToString = (rgb, alpha = 1) =>
   `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
 
-const isLine = type => type === types.Line;
+const isLine = type => type === dataTypes.Line;
 
 const calculateVerticalRatio = (maxValue, height) => {
   if (maxValue > height) {
@@ -162,9 +159,7 @@ const calculateVerticalRatio = (maxValue, height) => {
 
     if (maxValue < scaledHeight) {
       return scaledHeight / maxValue;
-    } else {
-      return 1;
-    }
+    } else return 1;
   }
 };
 
@@ -184,45 +179,11 @@ const createHiDPICanvas = (w, h) => {
   return canvas;
 };
 
-const findExtremums = (data, excludes, range) => {
-  let max = -Infinity;
-  let min = Infinity;
-  let from = 1;
-  let to = data.columns[0].length;
-
-  if (range) {
-    from = range[0] + 1;
-    to = range[1] + 1;
-  }
-
-  for (let column of data.columns) {
-    const type = column[0];
-
-    if (isLine(data.types[type]) && !excludes[type]) {
-      for (let i = from; i < to; i++) {
-        if (column[i] > max) {
-          max = column[i];
-        }
-        if (column[i] < min) {
-          min = column[i];
-        }
-      }
-    }
-  }
-
-  if (max !== -Infinity) {
-    max += min;
-  }
-
-  return { max, min };
-};
-
 const fuzzyAdd = (sum, number) => {
   const result = sum + number;
 
-  if (sum > 0) {
-    return result < 0 ? 0 : result;
-  }
+  if (sum > 0) return result < 0 ? 0 : result;
+
   return result > 0 ? 0 : result;
 };
 
@@ -257,15 +218,10 @@ class Chart {
   constructor(container, data, { w, h }) {
     this._data = data;
     this._dataCount = data.columns[0].length - 1;
-    this._localExtremums = null;
 
     this._chart = createCanvasObject(cavasType.Chart, w, h);
     this._chart.canvas.className = "chart__chart-canvas";
     this._chart.context = this._chart.canvas.getContext("2d");
-
-    this._graph = createCanvasObject(cavasType.Graph, w, h);
-    this._graph.canvas.className = "chart__graph-canvas";
-    this._graph.context = this._graph.canvas.getContext("2d");
 
     this._minimap = createCanvasObject(cavasType.Minimap, w, MINIMAP_HEIGHT);
     this._minimap.canvas.className = "chart__minimap-canvas";
@@ -325,7 +281,6 @@ class Chart {
     wrapper.className = "chart__minimap-wrapper";
     wrapper.appendChild(this._minimap.canvas);
     wrapper.appendChild(dragger);
-    fragment.appendChild(this._graph.canvas);
     fragment.appendChild(this._chart.canvas);
     fragment.appendChild(wrapper);
     this._container.appendChild(fragment);
@@ -345,17 +300,66 @@ class Chart {
     _$TelegramCharts.mouseupConsumers.push(this._endDrag);
     _$TelegramCharts.mousemoveConsumers.push(this._moveDrag);
 
-    this._localExtremums = findExtremums(
-      this._data,
-      this._state.exclude,
-      this._getHorisontalParams(this._chart).window
-    );
+    this._localExtremums = {
+      prev: { min: 0, max: 0 },
+      current: { min: 0, max: 0 }
+    };
 
-    this._globalExtremums = findExtremums(this._data, this._state.exclude);
+    this._globalExtremums = {
+      prev: { min: 0, max: 0 },
+      current: { min: 0, max: 0 }
+    };
+
     _$TelegramCharts.modeSwitcherData.updateHooks.push(this._animationLoop);
 
+    this._findAllExtremums();
     this._render();
     this._renderButtons();
+  }
+
+  _findAllExtremums() {
+    this._findExtremums(
+      this._localExtremums,
+      this._getHorisontalParams(this._chart).window
+    );
+    this._findExtremums(this._globalExtremums);
+  }
+
+  _findExtremums(store, range) {
+    const { _data, _state } = this;
+    let max = -Infinity;
+    let min = Infinity;
+    let from = 1;
+    let to = _data.columns[0].length;
+
+    if (range) {
+      from = range[0] + 1;
+      to = range[1] + 1;
+    }
+
+    for (let column of _data.columns) {
+      const type = column[0];
+
+      if (isLine(_data.types[type]) && !_state.exclude[type]) {
+        for (let i = from; i < to; i++) {
+          if (column[i] > max) {
+            max = column[i];
+          }
+          if (column[i] < min) {
+            min = column[i];
+          }
+        }
+      }
+    }
+
+    if (max !== -Infinity) {
+      max += min;
+    }
+
+    store.prev.min = store.current.min;
+    store.prev.max = store.current.max;
+    store.current.min = min;
+    store.current.max = max;
   }
 
   _startDrag(event) {
@@ -435,25 +439,15 @@ class Chart {
   }
 
   _checkYScaleChange() {
-    const localExtremums = findExtremums(
-      this._data,
-      this._state.exclude,
-      this._getHorisontalParams(this._chart).window
-    );
-
-    const localExtremumsSaved = this._localExtremums;
+    const extremums = this._localExtremums;
+    this._findAllExtremums();
 
     if (
-      localExtremumsSaved.max !== localExtremums.max ||
-      localExtremumsSaved.min !== localExtremums.min
+      extremums.prev.max !== extremums.current.max ||
+      extremums.prev.min !== extremums.current.min
     ) {
       this._pushAnimation(
-        this._animateVertical(
-          this._findVerticalRatioDelta(
-            localExtremums,
-            findExtremums(this._data, this._state.exclude)
-          )
-        )
+        this._animateVertical(this._findVerticalRatioDelta())
       );
     }
   }
@@ -492,10 +486,11 @@ class Chart {
 
   _drawChart() {
     this._chart.context.lineWidth = 1;
-    this._renderAdditionalInfo(this._graph);
+    this._renderAdditionalInfo(this._chart);
     this._chart.context.lineWidth = 2;
-    this._renderChart(this._chart, this._getHorisontalParams(this._chart));
-    this._renderLabels(this._graph);
+    const xParams = this._getHorisontalParams(this._chart);
+    this._renderChart(this._chart, xParams);
+    this._renderLabels(this._chart, xParams);
   }
 
   _drawMinimap() {
@@ -535,7 +530,7 @@ class Chart {
     context.closePath();
   }
 
-  _renderLabels({ context, height }) {
+  _renderLabels({ context, height }, { shift }) {
     const { _localExtremums: extremums } = this;
     const stepSize = height / LINES_COUNT;
 
@@ -543,26 +538,29 @@ class Chart {
     context.fillStyle =
       colors.ChartText[_$TelegramCharts.modeSwitcherData.mode];
 
-    if (extremums.max !== -Infinity) {
+    if (extremums.current.max !== -Infinity) {
       for (let i = 0; i < LINES_COUNT; i++) {
-        const shift = height - i * stepSize;
+        const yShift = height - i * stepSize;
         context.fillText(
-          Math.round(extremums.max * (i / LINES_COUNT)),
-          0,
-          shift - 6
+          Math.round(extremums.current.max * (i / LINES_COUNT)),
+          -shift,
+          yShift - 6
         );
       }
     }
   }
 
   _getHorisontalParams({ width, type }) {
-    const { _transitions: transitions, _dataCount: count } = this;
+    const {
+      _transitions: { xShift, [type]: record },
+      _dataCount: count
+    } = this;
     const xRatio = calculateHorisontalRatio(count, width);
-    const scale = xRatio * transitions[type].xRatioModifer;
+    const scale = xRatio * record.xRatioModifer;
 
     const params = {
       scale,
-      shift: -(count * scale * transitions.xShift),
+      shift: -(count * scale * xShift),
       window: []
     };
 
@@ -581,41 +579,42 @@ class Chart {
       type === cavasType.Chart ? _localExtremums : _globalExtremums;
 
     return (
-      calculateVerticalRatio(usedExtremums.max, height) +
+      calculateVerticalRatio(usedExtremums.current.max, height) +
       _transitions[type].yRatioModifer
     );
   }
 
-  _renderChart(canvasParams, xParams) {
+  _renderChart(canvasParams, { scale, shift }) {
     const { context, width, height, type: canvasType } = canvasParams;
-    const { _data: data, _transitions: transitions } = this;
+    const {
+      _data: data,
+      _transitions: { opacity }
+    } = this;
     const isChart = canvasType === cavasType.Chart;
     const yScale = this._getVerticalParams(canvasParams);
-    const xScale = xParams.scale;
-    const xShift = xParams.shift;
 
-    if (xShift && isChart) {
-      context.translate(xShift, 0);
+    if (shift && isChart) {
+      context.translate(shift, 0);
     }
 
     for (let column of data.columns) {
       const type = column[0];
-      const opacity = transitions.opacity[type];
+      const opacityValue = opacity[type];
 
-      if (isLine(data.types[type]) && opacity !== 0) {
+      if (isLine(data.types[type]) && opacityValue !== 0) {
         context.beginPath();
-        context.strokeStyle = rgbToString(this._rgbColors[type], opacity);
+        context.strokeStyle = rgbToString(this._rgbColors[type], opacityValue);
         context.moveTo(0, height - column[1] * yScale);
 
         for (let i = 2; i < column.length; i++) {
-          if (isChart && (i + 1) * xScale + xShift < 0) {
+          if (isChart && (i + 1) * scale + shift < 0) {
             continue;
           }
 
-          const x = i * xScale;
+          const x = i * scale;
           context.lineTo(x, height - column[i] * yScale);
 
-          if (isChart && x + xShift > width) {
+          if (isChart && x + shift > width) {
             break;
           }
         }
@@ -631,7 +630,7 @@ class Chart {
     const { _data: data, _container: container } = this;
 
     for (let type in data.types) {
-      if (data.types[type] === types.Line) {
+      if (data.types[type] === dataTypes.Line) {
         items += `<li class="charts-selector__item">
           <label class="checkbox" style="color: ${rgbToString(
             this._rgbColors[type]
@@ -663,20 +662,8 @@ class Chart {
   _onChangeCheckbox({ target }) {
     this._pushAnimation(this._animateHideChart(target.name, target.checked));
     this._state.exclude[target.name] = !target.checked;
-
-    this._pushAnimation(
-      this._animateVertical(
-        this._findVerticalRatioDelta(
-          findExtremums(
-            this._data,
-            this._state.exclude,
-            this._getHorisontalParams(this._chart).window
-          ),
-          findExtremums(this._data, this._state.exclude)
-        )
-      )
-    );
-
+    this._findAllExtremums();
+    this._pushAnimation(this._animateVertical(this._findVerticalRatioDelta()));
     this._animationLoop();
   }
 
@@ -684,24 +671,22 @@ class Chart {
     this._animations[animation.tag] = animation.hook;
   }
 
-  _findVerticalRatioDelta(localExtremums, globalExtremums) {
-    const oldExtremumsLocal = this._localExtremums;
-    const oldExtremumsGlobal = this._globalExtremums;
+  _findVerticalRatioDelta() {
+    const glob = this._globalExtremums;
+    const local = this._localExtremums;
+
     const deltas = {};
 
     for (const canvasType of chartTypesList) {
       const { height } = this[`_${canvasType}`];
       const isChart = canvasType === cavasType.Chart;
-      const extrOld = isChart ? oldExtremumsLocal : oldExtremumsGlobal;
-      const extrNew = isChart ? localExtremums : globalExtremums;
+      const extrOld = isChart ? local.prev : glob.prev;
+      const extrNew = isChart ? local.current : glob.current;
 
       deltas[canvasType] =
         calculateVerticalRatio(extrNew.max, height) -
         calculateVerticalRatio(extrOld.max, height);
     }
-
-    this._localExtremums = localExtremums;
-    this._globalExtremums = globalExtremums;
 
     return deltas;
   }
@@ -798,7 +783,6 @@ class Chart {
     }
 
     this._clear(this._chart.canvas);
-    this._clear(this._graph.canvas);
     this._clear(this._minimap.canvas);
 
     if (Object.keys(this._animations).length || this._state.drag.active) {

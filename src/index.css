@@ -52,7 +52,6 @@ body {
 }
 
 .chart {
-  position: relative;
   display: flex;
   flex-direction: column;
 }
@@ -129,7 +128,6 @@ body {
 }
 
 .chart__chart-canvas {
-  position: absolute;
 }
 
 .charts-selector__item + .charts-selector__item {

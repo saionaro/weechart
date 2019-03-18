@@ -3,6 +3,7 @@
  * * Add dates labels
  * * Floating window
  * * Night-mode
+ * * Touch events
  */
 
 const VERBOSE = false;
@@ -10,8 +11,8 @@ const VERBOSE = false;
 const DATA_ENDPOINT = "./chart_data.json";
 const LINES_COUNT = 6;
 const SCALE_RATE = 1;
-const MINIMAP_HEIGHT = 50;
-const INITIAL_X_SCALE = 10;
+const MINIMAP_HEIGHT = 75;
+const INITIAL_X_SCALE = 5;
 const ANIMATION_STEPS = 16;
 const HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
 const PIXEL_RATIO = (() => {
@@ -83,7 +84,7 @@ const chartTypesList = [cavasType.Minimap, cavasType.Chart];
 const colors = {
   ChartSeparator: "#ebf0f3",
   ChartText: "#94a2ab",
-  MinimapBackground: "#f4f9fb"
+  MinimapBackground: "rgba(240, 247, 252, 0.6)"
 };
 
 const CheckedIcon = `<svg
@@ -146,6 +147,10 @@ const calculateVerticalRatio = (maxValue, height) => {
 };
 
 const calculateHorisontalRatio = (count, width) => width / count;
+
+const setTransform = (style, value) => {
+  style.transform = `translateX(${value}px)`;
+};
 
 const createHiDPICanvas = (w, h) => {
   const canvas = document.createElement("canvas");
@@ -210,7 +215,7 @@ const createCanvasObject = (type, width, height) => ({
 const createDragger = width => {
   const dragger = document.createElement("div");
   dragger.className = "chart__minimap-dragger hide-selection";
-  dragger.style.height = `${MINIMAP_HEIGHT}px`;
+  dragger.style.height = `${MINIMAP_HEIGHT - 4}px`;
   dragger.style.width = `${width}px`;
 
   const arrowLeft = document.createElement("div");
@@ -245,7 +250,6 @@ class Chart {
     this._minimap.context = this._minimap.canvas.getContext("2d");
 
     this._rgbColors = {};
-    this._transitions = {};
     this._animations = [];
 
     this._transitions = {
@@ -273,6 +277,7 @@ class Chart {
     this._container = container;
     this._checkboxContainer = null;
     const dragWidth = w / INITIAL_X_SCALE;
+    const viewShift = w - dragWidth;
     this._state = {
       exclude: {},
       drag: {
@@ -284,13 +289,16 @@ class Chart {
         initialWidth: dragWidth,
         width: dragWidth,
         downX: 0,
-        deltaX: 0
+        marginLeft: viewShift
       }
     };
     const fragment = document.createDocumentFragment();
     const wrapper = document.createElement("div");
-    const dragger = createDragger(this._state.drag.width);
+    const dragger = createDragger(dragWidth);
     this._state.drag.dragger = dragger;
+
+    setTransform(dragger.style, viewShift);
+    this._transitions.xShift = viewShift / this._minimap.width;
 
     wrapper.className = "chart__minimap-wrapper";
     wrapper.appendChild(this._minimap.canvas);
@@ -369,24 +377,24 @@ class Chart {
     if (drag.resize) {
       if (drag.leftArrow) {
         if (
-          drag.width - movementX < drag.initialWidth ||
-          drag.deltaX + movementX < 0
+          drag.width - movementX < drag.initialWidth / 2 ||
+          drag.marginLeft + movementX < 0
         ) {
           return;
         }
 
-        const newVal = drag.deltaX + movementX;
+        const newVal = drag.marginLeft + movementX;
         const newShift = newVal / this._minimap.width;
-        drag.deltaX = newVal;
-        drag.dragger.style.transform = `translateX(${newVal}px)`;
+        drag.marginLeft = newVal;
+        setTransform(drag.dragger.style, newVal);
         this._transitions.xShift = newShift;
 
         return this._changeDragWidth(-movementX);
       }
 
       if (
-        movementX + drag.width < drag.initialWidth ||
-        maxPadding < drag.deltaX + movementX
+        drag.width + movementX < drag.initialWidth / 2 ||
+        drag.marginLeft + movementX > maxPadding
       ) {
         return;
       }
@@ -394,10 +402,10 @@ class Chart {
       return this._changeDragWidth(movementX);
     }
 
-    const sum = drag.deltaX + movementX;
+    const sum = drag.marginLeft + movementX;
     const val = sum < 0 ? 0 : sum > maxPadding ? maxPadding : sum;
-    drag.dragger.style.transform = `translateX(${val}px)`;
-    drag.deltaX = val;
+    setTransform(drag.dragger.style, val);
+    drag.marginLeft = val;
 
     this._transitions.xShift = val / this._minimap.width;
     this._checkYScaleChange();
@@ -470,8 +478,14 @@ class Chart {
   _drawMinimap() {
     const { context, canvas } = this._minimap;
     context.fillStyle = colors.MinimapBackground;
-    context.fillRect(0, 0, canvas.width, canvas.height);
     this._renderChart(this._minimap, this._getHorisontalParams(this._minimap));
+    context.fillRect(0, 0, this._state.drag.marginLeft, canvas.height);
+    context.fillRect(
+      this._state.drag.marginLeft + this._state.drag.width,
+      0,
+      canvas.width,
+      canvas.height
+    );
   }
 
   _clear(canvas) {

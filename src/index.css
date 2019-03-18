@@ -52,7 +52,10 @@ html {
   display: flex;
   position: absolute;
   top: 0;
-  background-color: rgba(1, 1, 1, 0.2);
+  background-color: transparent;
+  border: 2px solid rgba(219, 234, 244, 0.8);
+  border-left: none;
+  border-right: 0;
 }
 
 .chart__minimap-dragger--dragging {
@@ -61,7 +64,7 @@ html {
 .chart__minimap-dragger-arrow {
   height: 100%;
   width: 10px;
-  background-color: red;
+  background-color: rgba(219, 234, 244, 0.8);
 }
 
 .chart__minimap-dragger-arrow--right {

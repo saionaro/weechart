@@ -1,9 +1,9 @@
 /**
  * TODO
- * * Add paddings
  * * Add dates labels
  * * Floating window
  * * Night-mode
+ * * Smooth scale while animation
  */
 
 const VERBOSE = true;
@@ -151,6 +151,10 @@ const findExtremums = (data, excludes, range) => {
         }
       }
     }
+  }
+
+  if (max !== -Infinity) {
+    max += min;
   }
 
   return { max, min };
@@ -490,22 +494,6 @@ class Chart {
     const { context, width, height, type: canvasType } = canvasParams;
     const { _data: data, _transitions: transitions } = this;
     const isChart = canvasType === cavasType.Chart;
-
-    // full = 1200
-    // 10% => 120
-
-    // TODO paddings
-    // const lowestDot = extremums.min * verticalRatio;
-    // const highestDot = extremums.max * verticalRatio;
-    // const paddings = (scaledPixelsHeight - (highestDot - lowestDot)) / 2;
-    // const delta = 0; //lowestDot - paddings;
-
-    // if (VERBOSE) {
-    //   console.log("Vertical ratio: " + yRatio);
-    //   console.log("Horisontal ratio: " + xRatio);
-    //   console.log(extremums);
-    // }
-
     const yScale = this._getVerticalParams(canvasParams);
     const xScale = xParams.scale;
     const xShift = xParams.shift;

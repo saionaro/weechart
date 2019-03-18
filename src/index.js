@@ -174,10 +174,10 @@ const createCanvasObject = (type, width, height) => ({
 });
 
 const createDragger = width => {
-  const drugger = document.createElement("div");
-  drugger.className = "chart__minimap-dragger";
-  drugger.style.height = `${MINIMAP_HEIGHT}px`;
-  drugger.style.width = `${width}px`;
+  const dragger = document.createElement("div");
+  dragger.className = "chart__minimap-dragger";
+  dragger.style.height = `${MINIMAP_HEIGHT}px`;
+  dragger.style.width = `${width}px`;
 
   const arrowLeft = document.createElement("div");
   arrowLeft.className =
@@ -186,10 +186,10 @@ const createDragger = width => {
   arrowRight.className =
     "chart__minimap-dragger-arrow chart__minimap-dragger-arrow--right";
 
-  drugger.appendChild(arrowLeft);
-  drugger.appendChild(arrowRight);
+  dragger.appendChild(arrowLeft);
+  dragger.appendChild(arrowRight);
 
-  return drugger;
+  return dragger;
 };
 
 class Chart {

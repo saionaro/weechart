@@ -6,7 +6,7 @@
  * * Night-mode
  */
 
-const VERBOSE = false;
+const VERBOSE = true;
 
 const DATA_ENDPOINT = "./chart_data.json";
 const LINES_COUNT = 6;
@@ -588,8 +588,8 @@ class Chart {
   }
 
   _findVerticalRatioDelta() {
-    const oldExtremums = this._localExtremums;
-    const newExtremums = findExtremums(
+    const oldExtremumsLocal = this._localExtremums;
+    const newExtremumsLocal = findExtremums(
       this._data,
       this._state.exclude,
       this._getHorisontalParams(this._chart).window
@@ -601,16 +601,16 @@ class Chart {
 
     for (const canvasType of chartTypesList) {
       const { height } = this[`_${canvasType}`];
-      const isChart = canvasType === canvasType.Chart;
-      const extrOld = isChart ? oldExtremums : oldExtremumsGlobal;
-      const extrNew = isChart ? newExtremums : newExtremumsGlobal;
+      const isChart = canvasType === cavasType.Chart;
+      const extrOld = isChart ? oldExtremumsLocal : oldExtremumsGlobal;
+      const extrNew = isChart ? newExtremumsLocal : newExtremumsGlobal;
 
-      const oldVerticalRatio = calculateVerticalRatio(extrOld.max, height);
-      const newVerticalRatio = calculateVerticalRatio(extrNew.max, height);
-      deltas[canvasType] = newVerticalRatio - oldVerticalRatio;
+      deltas[canvasType] =
+        calculateVerticalRatio(extrNew.max, height) -
+        calculateVerticalRatio(extrOld.max, height);
     }
 
-    this._localExtremums = newExtremums;
+    this._localExtremums = newExtremumsLocal;
     this._globalExtremums = newExtremumsGlobal;
 
     return deltas;
@@ -631,6 +631,8 @@ class Chart {
           console.log("animate vertical");
         }
 
+        let finishedAnimations = 0;
+
         for (let canvasType of chartTypesList) {
           const record = this._transitions[canvasType];
           const yModifer = record.yRatioModifer;
@@ -640,10 +642,14 @@ class Chart {
             (yModifer <= 0 && deltas[canvasType] < 0) ||
             steps[canvasType] === 0
           ) {
-            delete this._animations[tag];
+            finishedAnimations++;
           } else {
             record.yRatioModifer = fuzzyAdd(yModifer, steps[canvasType]);
           }
+        }
+
+        if (finishedAnimations === chartTypesList.length) {
+          delete this._animations[tag];
         }
       },
       tag

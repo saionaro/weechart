@@ -3,10 +3,9 @@
  * * Add dates labels
  * * Floating window
  * * Night-mode
- * * Smooth scale while animation
  */
 
-const VERBOSE = true;
+const VERBOSE = false;
 
 const DATA_ENDPOINT = "./chart_data.json";
 const LINES_COUNT = 6;
@@ -366,7 +365,31 @@ class Chart {
     drag.deltaX = val;
 
     this._transitions.xShift = val / this._minimap.width;
-    this._pushAnimation(this._animateVertical(this._findVerticalRatioDelta()));
+    this._checkYScaleChange();
+  }
+
+  _checkYScaleChange() {
+    const localExtremums = findExtremums(
+      this._data,
+      this._state.exclude,
+      this._getHorisontalParams(this._chart).window
+    );
+
+    const localExtremumsSaved = this._localExtremums;
+
+    if (
+      localExtremumsSaved.max !== localExtremums.max ||
+      localExtremumsSaved.min !== localExtremums.min
+    ) {
+      this._pushAnimation(
+        this._animateVertical(
+          this._findVerticalRatioDelta(
+            localExtremums,
+            findExtremums(this._data, this._state.exclude)
+          )
+        )
+      );
+    }
   }
 
   _changeDragWidth(delta) {
@@ -383,6 +406,7 @@ class Chart {
         deltaRatio * record.xRatioModifer
       )
     );
+    this._checkYScaleChange();
   }
 
   _endDrag() {
@@ -409,13 +433,9 @@ class Chart {
   }
 
   _drawMinimap() {
-    this._minimap.context.fillStyle = colors.MinimapBackground;
-    this._minimap.context.fillRect(
-      0,
-      0,
-      this._minimap.canvas.width,
-      this._minimap.canvas.height
-    );
+    const { context, canvas } = this._minimap;
+    context.fillStyle = colors.MinimapBackground;
+    context.fillRect(0, 0, canvas.width, canvas.height);
     this._renderChart(this._minimap, this._getHorisontalParams(this._minimap));
   }
 
@@ -472,9 +492,10 @@ class Chart {
     };
 
     const start = Math.round(-params.shift / params.scale) - 1;
+    const end = Math.round((width - params.shift) / params.scale);
 
     params.window[0] = start < 0 ? 0 : start;
-    params.window[1] = Math.round((width - params.shift) / params.scale);
+    params.window[1] = end > count ? count : end;
 
     return params;
   }
@@ -567,7 +588,20 @@ class Chart {
   _onChangeCheckbox({ target }) {
     this._pushAnimation(this._animateHideChart(target.name, target.checked));
     this._state.exclude[target.name] = !target.checked;
-    this._pushAnimation(this._animateVertical(this._findVerticalRatioDelta()));
+
+    this._pushAnimation(
+      this._animateVertical(
+        this._findVerticalRatioDelta(
+          findExtremums(
+            this._data,
+            this._state.exclude,
+            this._getHorisontalParams(this._chart).window
+          ),
+          findExtremums(this._data, this._state.exclude)
+        )
+      )
+    );
+
     this._animationLoop();
   }
 
@@ -575,31 +609,24 @@ class Chart {
     this._animations[animation.tag] = animation.hook;
   }
 
-  _findVerticalRatioDelta() {
+  _findVerticalRatioDelta(localExtremums, globalExtremums) {
     const oldExtremumsLocal = this._localExtremums;
-    const newExtremumsLocal = findExtremums(
-      this._data,
-      this._state.exclude,
-      this._getHorisontalParams(this._chart).window
-    );
-
     const oldExtremumsGlobal = this._globalExtremums;
-    const newExtremumsGlobal = findExtremums(this._data, this._state.exclude);
     const deltas = {};
 
     for (const canvasType of chartTypesList) {
       const { height } = this[`_${canvasType}`];
       const isChart = canvasType === cavasType.Chart;
       const extrOld = isChart ? oldExtremumsLocal : oldExtremumsGlobal;
-      const extrNew = isChart ? newExtremumsLocal : newExtremumsGlobal;
+      const extrNew = isChart ? localExtremums : globalExtremums;
 
       deltas[canvasType] =
         calculateVerticalRatio(extrNew.max, height) -
         calculateVerticalRatio(extrOld.max, height);
     }
 
-    this._localExtremums = newExtremumsLocal;
-    this._globalExtremums = newExtremumsGlobal;
+    this._localExtremums = localExtremums;
+    this._globalExtremums = globalExtremums;
 
     return deltas;
   }

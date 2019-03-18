@@ -58,6 +58,7 @@ const _$TelegramCharts = {
       _$TelegramCharts.onMouseUp,
       listenerOpts
     );
+    _$TelegramCharts.listenersActivated = true;
   }
 };
 
@@ -208,7 +209,7 @@ const createCanvasObject = (type, width, height) => ({
 
 const createDragger = width => {
   const dragger = document.createElement("div");
-  dragger.className = "chart__minimap-dragger";
+  dragger.className = "chart__minimap-dragger hide-selection";
   dragger.style.height = `${MINIMAP_HEIGHT}px`;
   dragger.style.width = `${width}px`;
 

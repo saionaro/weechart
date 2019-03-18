@@ -31,6 +31,36 @@ const listenerOpts = {
   passive: true
 };
 
+const _$TelegramCharts = {
+  listenersActivated: false,
+  mousemoveConsumers: [],
+  mouseupConsumers: [],
+  onMouseUp: event => {
+    const mouseupConsumers = _$TelegramCharts.mouseupConsumers;
+    for (let i = 0; i < mouseupConsumers.length; i++) {
+      mouseupConsumers[i](event);
+    }
+  },
+  onMouseMove: event => {
+    const mousemoveConsumers = _$TelegramCharts.mousemoveConsumers;
+    for (let i = 0; i < mousemoveConsumers.length; i++) {
+      mousemoveConsumers[i](event);
+    }
+  },
+  activateDragEvents: () => {
+    window.document.addEventListener(
+      "mousemove",
+      _$TelegramCharts.onMouseMove,
+      listenerOpts
+    );
+    window.document.addEventListener(
+      "mouseup",
+      _$TelegramCharts.onMouseUp,
+      listenerOpts
+    );
+  }
+};
+
 const types = {
   Line: "line",
   Date: "x"
@@ -276,9 +306,13 @@ class Chart {
     this._endDrag = this._endDrag.bind(this);
 
     dragger.addEventListener("mousedown", this._startDrag, listenerOpts);
-    wrapper.addEventListener("mouseup", this._endDrag, listenerOpts);
-    wrapper.addEventListener("mouseleave", this._endDrag, listenerOpts);
-    wrapper.addEventListener("mousemove", this._moveDrag, listenerOpts);
+
+    if (!_$TelegramCharts.listenersActivated) {
+      _$TelegramCharts.activateDragEvents();
+    }
+
+    _$TelegramCharts.mouseupConsumers.push(this._endDrag);
+    _$TelegramCharts.mousemoveConsumers.push(this._moveDrag);
 
     this._localExtremums = findExtremums(
       this._data,

@@ -2,7 +2,6 @@
  * TODO
  * * Add dates labels
  * * Floating window
- * * Night-mode
  * * Touch events
  */
 
@@ -28,11 +27,27 @@ const PIXEL_RATIO = (() => {
   return dpr / bsr;
 })();
 
+let appElement;
+
+const modes = {
+  Night: "night",
+  Day: "day"
+};
+
 const listenerOpts = {
   passive: true
 };
 
 const _$TelegramCharts = {
+  modeSwitcherData: {
+    element: null,
+    updateHooks: [],
+    captions: {
+      [modes.Night]: "Switch to Day Mode",
+      [modes.Day]: "Switch to Night Mode"
+    },
+    mode: modes.Day
+  },
   listenersActivated: false,
   mousemoveConsumers: [],
   mouseupConsumers: [],
@@ -82,9 +97,18 @@ const extremumType = {
 const chartTypesList = [cavasType.Minimap, cavasType.Chart];
 
 const colors = {
-  ChartSeparator: "#ebf0f3",
-  ChartText: "#94a2ab",
-  MinimapBackground: "rgba(240, 247, 252, 0.6)"
+  ChartSeparator: {
+    day: "#ebf0f3",
+    night: "#273545"
+  },
+  ChartText: {
+    day: "#94a2ab",
+    night: "#4c6274"
+  },
+  MinimapBackground: {
+    day: "rgba(240, 247, 252, 0.6)",
+    night: "rgba(29, 42, 57, 0.8)"
+  }
 };
 
 const CheckedIcon = `<svg
@@ -110,8 +134,6 @@ const CheckedIcon = `<svg
     fill="none"
   />
 </svg>`;
-
-let chartSet;
 
 const hexToRgb = hex => {
   const result = HEX_REGEX.exec(hex);
@@ -330,6 +352,7 @@ class Chart {
     );
 
     this._globalExtremums = findExtremums(this._data, this._state.exclude);
+    _$TelegramCharts.modeSwitcherData.updateHooks.push(this._animationLoop);
 
     this._render();
     this._renderButtons();
@@ -477,7 +500,8 @@ class Chart {
 
   _drawMinimap() {
     const { context, canvas } = this._minimap;
-    context.fillStyle = colors.MinimapBackground;
+    context.fillStyle =
+      colors.MinimapBackground[_$TelegramCharts.modeSwitcherData.mode];
     this._renderChart(this._minimap, this._getHorisontalParams(this._minimap));
     context.fillRect(0, 0, this._state.drag.marginLeft, canvas.height);
     context.fillRect(
@@ -498,7 +522,8 @@ class Chart {
     const stepSize = height / LINES_COUNT;
 
     context.beginPath();
-    context.strokeStyle = colors.ChartSeparator;
+    context.strokeStyle =
+      colors.ChartSeparator[_$TelegramCharts.modeSwitcherData.mode];
 
     for (let i = 0; i < LINES_COUNT; i++) {
       const shift = height - i * stepSize;
@@ -515,7 +540,8 @@ class Chart {
     const stepSize = height / LINES_COUNT;
 
     context.lineWidth = 1;
-    context.fillStyle = colors.ChartText;
+    context.fillStyle =
+      colors.ChartText[_$TelegramCharts.modeSwitcherData.mode];
 
     if (extremums.max !== -Infinity) {
       for (let i = 0; i < LINES_COUNT; i++) {
@@ -771,23 +797,23 @@ class Chart {
       console.log("animation tick");
     }
 
+    this._clear(this._chart.canvas);
+    this._clear(this._graph.canvas);
+    this._clear(this._minimap.canvas);
+
     if (Object.keys(this._animations).length || this._state.drag.active) {
       for (let key in this._animations) {
         this._animations[key]();
       }
-      this._clear(this._chart.canvas);
-      this._clear(this._graph.canvas);
-      this._clear(this._minimap.canvas);
-
       this._render();
       window.requestAnimationFrame(this._animationLoop);
+    } else {
+      this._render();
     }
   }
 }
 
 const onFetchData = data => {
-  chartSet = data;
-  const appContainer = document.querySelector(".app");
   const fragment = document.createDocumentFragment();
 
   const w = 800;
@@ -800,7 +826,8 @@ const onFetchData = data => {
     fragment.appendChild(chartContainer);
   }
 
-  appContainer.appendChild(fragment);
+  appElement.querySelector(".app__charts").appendChild(fragment);
+  _$TelegramCharts.modeSwitcherData.element.className = "button mode-switcher";
 };
 
 const fetchData = () =>
@@ -808,8 +835,26 @@ const fetchData = () =>
     .then(data => data.json())
     .catch(console.log);
 
+const switchMode = () => {
+  const { modeSwitcherData: data } = _$TelegramCharts;
+  const isNight = data.mode === modes.Night;
+  const newMode = isNight ? modes.Day : modes.Night;
+
+  data.mode = newMode;
+  data.element.innerHTML = data.captions[newMode];
+  appElement.classList = isNight ? "app" : "app app--night";
+
+  for (let i = 0; i < data.updateHooks.length; i++) {
+    data.updateHooks[i]();
+  }
+};
+
 const bootUp = () => {
+  const switcherData = _$TelegramCharts.modeSwitcherData;
+  appElement = document.querySelector(".app");
   fetchData().then(onFetchData);
+  switcherData.element = appElement.querySelector(".mode-switcher");
+  switcherData.element.addEventListener("click", switchMode, listenerOpts);
 };
 
 document.addEventListener("DOMContentLoaded", bootUp);

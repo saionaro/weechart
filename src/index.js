@@ -102,12 +102,8 @@ const dataTypes = {
 
 const cavasType = {
   Minimap: "minimap",
-  Chart: "chart"
-};
-
-const extremumType = {
-  Local: "local",
-  Global: "global"
+  Chart: "chart",
+  Float: "float"
 };
 
 const chartTypesList = [cavasType.Minimap, cavasType.Chart];
@@ -116,6 +112,10 @@ const colors = {
   ChartSeparator: {
     day: "#ebf0f3",
     night: "#273545"
+  },
+  ChartBackground: {
+    day: "#ffffff",
+    night: "#222f3f"
   },
   ChartText: {
     day: "#94a2ab",
@@ -182,6 +182,9 @@ const calculateVerticalRatio = (maxValue, height) => {
 
 const calculateHorisontalRatio = (count, width) => width / count;
 
+const getCursorXPosition = (canvas, event) =>
+  event.clientX - canvas.getBoundingClientRect().left;
+
 const setTransform = (style, value) => {
   style.transform = `translateX(${value}px)`;
 };
@@ -204,6 +207,32 @@ const fuzzyAdd = (sum, number) => {
   if (sum > 0) return result < 0 ? 0 : result;
 
   return result > 0 ? 0 : result;
+};
+
+const throttle = (func, ms) => {
+  let isThrottled = false;
+  let savedArgs = null;
+
+  const wrapper = (...args) => {
+    if (isThrottled) {
+      savedArgs = args;
+      return;
+    }
+
+    func.apply(this, args);
+    isThrottled = true;
+
+    setTimeout(() => {
+      isThrottled = false;
+
+      if (savedArgs) {
+        wrapper(...savedArgs);
+        savedArgs = null;
+      }
+    }, ms);
+  };
+
+  return wrapper;
 };
 
 const cachedDates = {};
@@ -252,6 +281,10 @@ class Chart {
     this._chart.height -= DATE_MARGIN;
     this._chart.canvas.className = "chart__chart-canvas";
     this._chart.context = this._chart.canvas.getContext("2d");
+
+    this._float = createCanvasObject(cavasType.Float, w, h);
+    this._float.canvas.className = "chart__float-canvas";
+    this._float.context = this._float.canvas.getContext("2d");
 
     this._minimap = createCanvasObject(cavasType.Minimap, w, MINIMAP_HEIGHT);
     this._minimap.canvas.className = "chart__minimap-canvas";
@@ -312,6 +345,7 @@ class Chart {
     wrapper.appendChild(this._minimap.canvas);
     wrapper.appendChild(dragger);
     fragment.appendChild(this._chart.canvas);
+    fragment.appendChild(this._float.canvas);
     fragment.appendChild(wrapper);
     this._container.appendChild(fragment);
 
@@ -320,6 +354,8 @@ class Chart {
     this._startDrag = this._startDrag.bind(this);
     this._moveDrag = this._moveDrag.bind(this);
     this._endDrag = this._endDrag.bind(this);
+    this._floatMouseMove = throttle(this._floatMouseMove.bind(this), 60);
+    this._floatMouseLeave = this._floatMouseLeave.bind(this);
 
     dragger.addEventListener("mousedown", this._startDrag, listenerOpts);
 
@@ -330,6 +366,18 @@ class Chart {
     _$TelegramCharts.mouseupConsumers.push(this._endDrag);
     _$TelegramCharts.mousemoveConsumers.push(this._moveDrag);
     _$TelegramCharts.modeSwitcherData.updateHooks.push(this._animationLoop);
+
+    this._float.canvas.addEventListener(
+      "mousemove",
+      this._floatMouseMove,
+      listenerOpts
+    );
+
+    this._float.canvas.addEventListener(
+      "mouseleave",
+      this._floatMouseLeave,
+      listenerOpts
+    );
 
     this._localExtremums = {
       prev: { min: 0, max: 0 },
@@ -344,6 +392,52 @@ class Chart {
     this._findAllExtremums();
     this._render();
     this._renderButtons();
+  }
+
+  _floatMouseMove(event) {
+    const { scale, shift, window } = this._getHorisontalParams(this._chart);
+    const cursorX = getCursorXPosition(this._float.canvas, event);
+    const selected = Math.ceil(cursorX / scale + window[0]);
+    this._drawFloatingLine(selected, selected * scale + shift);
+  }
+
+  _drawFloatingLine(index, x) {
+    const { canvas, context, height } = this._float;
+    const { opacity } = this._transitions;
+    this._clear(canvas);
+
+    context.beginPath();
+    context.lineWidth = 1;
+    context.strokeStyle =
+      colors.ChartSeparator[_$TelegramCharts.modeSwitcherData.mode];
+
+    context.moveTo(x, 0);
+    context.lineTo(x, height - DATE_MARGIN * 2);
+    context.stroke();
+
+    const yScale = this._getVerticalParams(this._chart);
+
+    for (let column of this._data.columns) {
+      const type = column[0];
+      const y = height - column[index] * yScale - DATE_MARGIN * 2;
+
+      if (isLine(this._data.types[type]) && opacity[type]) {
+        context.strokeStyle = rgbToString(this._rgbColors[type], 1);
+        context.beginPath();
+        context.arc(x, y, 5, 0, 2 * Math.PI, false);
+        context.fillStyle =
+          colors.ChartBackground[_$TelegramCharts.modeSwitcherData.mode];
+        context.fill();
+        context.lineWidth = 2;
+        context.stroke();
+      }
+    }
+  }
+
+  _floatMouseLeave() {
+    setTimeout(() => {
+      this._clear(this._float.canvas);
+    }, 100);
   }
 
   _findAllExtremums() {
@@ -681,7 +775,7 @@ class Chart {
     const { _data: data, _container: container } = this;
 
     for (let type in data.types) {
-      if (data.types[type] === dataTypes.Line) {
+      if (isLine(data.types[type])) {
         items += `<li class="charts-selector__item">
           <label class="checkbox" style="color: ${rgbToString(
             this._rgbColors[type]

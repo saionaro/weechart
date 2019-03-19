@@ -53,6 +53,7 @@ body {
 }
 
 .chart {
+  position: relative;
   display: flex;
   flex-direction: column;
 }
@@ -65,6 +66,13 @@ body {
   display: flex;
   margin-top: 16px;
   position: relative;
+}
+
+.chart__chart-canvas {
+}
+
+.chart__float-canvas {
+  position: absolute;
 }
 
 .chart__minimap-canvas {
@@ -127,9 +135,6 @@ body {
   margin: 0;
   display: flex;
   margin-top: 16px;
-}
-
-.chart__chart-canvas {
 }
 
 .charts-selector__item + .charts-selector__item {

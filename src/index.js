@@ -13,6 +13,7 @@ const SCALE_RATE = 1;
 const MINIMAP_HEIGHT = 75;
 const INITIAL_X_SCALE = 5;
 const ANIMATION_STEPS = 16;
+const DATE_MARGIN = 16;
 const HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
 const PIXEL_RATIO = (() => {
   const ctx = document.createElement("canvas").getContext("2d");
@@ -220,6 +221,7 @@ class Chart {
     this._dataCount = data.columns[0].length - 1;
 
     this._chart = createCanvasObject(cavasType.Chart, w, h);
+    this._chart.height -= DATE_MARGIN;
     this._chart.canvas.className = "chart__chart-canvas";
     this._chart.context = this._chart.canvas.getContext("2d");
 
@@ -299,6 +301,7 @@ class Chart {
 
     _$TelegramCharts.mouseupConsumers.push(this._endDrag);
     _$TelegramCharts.mousemoveConsumers.push(this._moveDrag);
+    _$TelegramCharts.modeSwitcherData.updateHooks.push(this._animationLoop);
 
     this._localExtremums = {
       prev: { min: 0, max: 0 },
@@ -309,8 +312,6 @@ class Chart {
       prev: { min: 0, max: 0 },
       current: { min: 0, max: 0 }
     };
-
-    _$TelegramCharts.modeSwitcherData.updateHooks.push(this._animationLoop);
 
     this._findAllExtremums();
     this._render();
@@ -363,9 +364,7 @@ class Chart {
   }
 
   _startDrag(event) {
-    if (event.which !== 1 || !event.target) {
-      return;
-    }
+    if (event.which !== 1 || !event.target) return;
 
     const { drag } = this._state;
     const { classList } = event.target;
@@ -389,15 +388,11 @@ class Chart {
   _moveDrag({ pageX, movementX }) {
     const { drag } = this._state;
 
-    if (!drag.active) {
-      return;
-    }
+    if (!drag.active) return;
 
     var moveX = pageX - drag.downX;
 
-    if (Math.abs(moveX) < 4 || movementX === 0) {
-      return;
-    }
+    if (Math.abs(moveX) < 4 || movementX === 0) return;
 
     const maxPadding = this._minimap.width - drag.width;
 
@@ -479,6 +474,12 @@ class Chart {
     this._state.drag.dragger.classList = "chart__minimap-dragger";
   }
 
+  _clear(canvas) {
+    const context = canvas.getContext("2d");
+    context.setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
+    context.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
   _render() {
     this._drawChart();
     this._drawMinimap();
@@ -494,23 +495,17 @@ class Chart {
   }
 
   _drawMinimap() {
-    const { context, canvas } = this._minimap;
+    const { context, height, width } = this._minimap;
     context.fillStyle =
       colors.MinimapBackground[_$TelegramCharts.modeSwitcherData.mode];
     this._renderChart(this._minimap, this._getHorisontalParams(this._minimap));
-    context.fillRect(0, 0, this._state.drag.marginLeft, canvas.height);
+    context.fillRect(0, 0, this._state.drag.marginLeft, height);
     context.fillRect(
       this._state.drag.marginLeft + this._state.drag.width,
       0,
-      canvas.width,
-      canvas.height
+      width,
+      height
     );
-  }
-
-  _clear(canvas) {
-    const context = canvas.getContext("2d");
-    context.setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
-    context.clearRect(0, 0, canvas.width, canvas.height);
   }
 
   _renderAdditionalInfo({ context, width, height }) {
@@ -522,8 +517,8 @@ class Chart {
 
     for (let i = 0; i < LINES_COUNT; i++) {
       const shift = height - i * stepSize;
-      context.moveTo(0, shift);
-      context.lineTo(width, shift);
+      context.moveTo(0, shift - DATE_MARGIN);
+      context.lineTo(width, shift - DATE_MARGIN);
     }
 
     context.stroke();
@@ -544,7 +539,7 @@ class Chart {
         context.fillText(
           Math.round(extremums.current.max * (i / LINES_COUNT)),
           -shift,
-          yShift - 6
+          yShift - 6 - DATE_MARGIN
         );
       }
     }
@@ -612,11 +607,14 @@ class Chart {
           }
 
           const x = i * scale;
-          context.lineTo(x, height - column[i] * yScale);
+          let y = height - column[i] * yScale;
 
-          if (isChart && x + shift > width) {
-            break;
+          if (isChart) {
+            y -= DATE_MARGIN;
           }
+          context.lineTo(x, y);
+
+          if (isChart && x + shift > width) break;
         }
 
         context.stroke();

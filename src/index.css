@@ -45,6 +45,7 @@ body {
   background-color: #ffffff;
   transition-property: background-color;
   transition-duration: 0.5s;
+  font-family: Helvetica, Arial, sans-serif;
 }
 
 .mode-switcher {
@@ -106,6 +107,7 @@ body {
   color: #42484b;
   transition-property: border-color;
   transition-duration: 0.5s;
+  font-size: 14px;
 }
 
 .checkbox__title {

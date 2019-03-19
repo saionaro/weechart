@@ -1,6 +1,7 @@
 /**
  * TODO
- * * Add dates labels
+ * * Animate dates
+ * * Animate y values and lines
  * * Floating window
  * * Touch events
  */
@@ -27,6 +28,21 @@ const PIXEL_RATIO = (() => {
     1;
   return dpr / bsr;
 })();
+
+const monthNames = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec"
+];
 
 let appElement;
 
@@ -176,7 +192,9 @@ const createHiDPICanvas = (w, h) => {
   canvas.height = h * PIXEL_RATIO;
   canvas.style.width = `${w}px`;
   canvas.style.height = `${h}px`;
-  canvas.getContext("2d").setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
+  const context = canvas.getContext("2d");
+  context.setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
+  context.font = "11px Helvetica, Arial";
   return canvas;
 };
 
@@ -186,6 +204,16 @@ const fuzzyAdd = (sum, number) => {
   if (sum > 0) return result < 0 ? 0 : result;
 
   return result > 0 ? 0 : result;
+};
+
+const cachedDates = {};
+
+const toDateString = timestamp => {
+  if (!cachedDates[timestamp]) {
+    const date = new Date(timestamp);
+    cachedDates[timestamp] = `${monthNames[date.getMonth()]} ${date.getDate()}`;
+  }
+  return cachedDates[timestamp];
 };
 
 const createCanvasObject = (type, width, height) => ({
@@ -592,11 +620,24 @@ class Chart {
       context.translate(shift, 0);
     }
 
+    const savedWidth = context.lineWidth;
+    const savedFillStyle = context.fillStyle;
+    let datesPainted = false;
+    let dates;
+
+    const everyCount = Math.round(100 / scale);
+
     for (let column of data.columns) {
       const type = column[0];
       const opacityValue = opacity[type];
+      const isDates = !isLine(data.types[type]);
 
-      if (isLine(data.types[type]) && opacityValue !== 0) {
+      if (isDates) {
+        dates = column;
+        continue;
+      }
+
+      if (opacityValue !== 0) {
         context.beginPath();
         context.strokeStyle = rgbToString(this._rgbColors[type], opacityValue);
         context.moveTo(0, height - column[1] * yScale);
@@ -614,9 +655,21 @@ class Chart {
           }
           context.lineTo(x, y);
 
+          if (isChart && !datesPainted && !(i % everyCount)) {
+            context.lineWidth = 1;
+            context.fillStyle =
+              colors.ChartText[_$TelegramCharts.modeSwitcherData.mode];
+
+            context.fillText(toDateString(dates[i]), x, height);
+
+            context.lineWidth = savedWidth;
+            context.fillStyle = savedFillStyle;
+          }
+
           if (isChart && x + shift > width) break;
         }
 
+        datesPainted = true;
         context.stroke();
         context.closePath();
       }

@@ -141,6 +141,48 @@ body {
   margin-left: 8px;
 }
 
+.floating-window {
+  position: absolute;
+  display: inline-flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border-radius: 4px;
+  box-shadow: 0 0 1px #bbbbbb;
+  color: #222222;
+  background-color: #ffffff;
+  transition-property: transform;
+  transition-duration: 0.3s;
+}
+
+.floating-window__date {
+  margin: 0;
+}
+
+.floating-window__sections {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  margin: 8px 0 0 0;
+  padding: 0;
+}
+
+.floating-window__section {
+  display: flex;
+  flex-direction: column;
+}
+
+.floating-window__section + .floating-window__section {
+  margin-left: 8px;
+}
+
+.floating-window__count {
+  font-weight: 600;
+}
+
+.floating-window__label {
+  font-size: 14px;
+}
+
 .app.app--night {
   background-color: #222f3f;
 }
@@ -159,4 +201,10 @@ body {
 
 .app--night .chart__minimap-dragger {
   border-color: rgba(59, 86, 109, 0.8);
+}
+
+.app--night .floating-window {
+  color: #ffffff;
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.3);
+  background-color: #233242;
 }

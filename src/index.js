@@ -2,8 +2,10 @@
  * TODO
  * * Animate dates
  * * Animate y values and lines
- * * Floating window
  * * Touch events
+ * * Optimize floating window rendering
+ * * Hide excluded data from floating window
+ * * Refactor code
  */
 
 const VERBOSE = false;
@@ -43,6 +45,8 @@ const monthNames = [
   "Nov",
   "Dec"
 ];
+
+const weekdaysNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 let appElement;
 
@@ -113,13 +117,17 @@ const colors = {
     day: "#ebf0f3",
     night: "#273545"
   },
+  FloatingLine: {
+    day: "#dee6eb",
+    night: "#384a5b"
+  },
   ChartBackground: {
     day: "#ffffff",
     night: "#222f3f"
   },
   ChartText: {
     day: "#94a2ab",
-    night: "#4c6274"
+    night: "#506779"
   },
   MinimapBackground: {
     day: "rgba(240, 247, 252, 0.6)",
@@ -245,6 +253,16 @@ const toDateString = timestamp => {
   return cachedDates[timestamp];
 };
 
+const cachedWeekdays = {};
+
+const toWeekday = timestamp => {
+  if (!cachedWeekdays[timestamp]) {
+    const date = new Date(timestamp);
+    cachedWeekdays[timestamp] = `${weekdaysNames[date.getDay()]}`;
+  }
+  return cachedWeekdays[timestamp];
+};
+
 const createCanvasObject = (type, width, height) => ({
   canvas: createHiDPICanvas(width, height),
   context: null,
@@ -270,6 +288,32 @@ const createDragger = width => {
   dragger.appendChild(arrowRight);
 
   return dragger;
+};
+
+const getLabelClass = title => `floating-window__${title.replace(/ +/g, "_")}`;
+
+const createFloatingWindow = (data, colors) => {
+  let sections = "";
+
+  for (let type in data.names) {
+    sections += `
+      <li class="floating-window__section" style="color: ${rgbToString(
+        colors[type]
+      )}">
+        <span class="floating-window__count ${getLabelClass(type)}"></span>
+        <span class="floating-window__label">${data.names[type]}</span>
+      </li>`;
+  }
+
+  const floatingWindow = document.createElement("div");
+  floatingWindow.className = "floating-window visually-hidden";
+  floatingWindow.innerHTML = `
+    <p class="floating-window__date"></p>
+      <ul class="floating-window__sections">
+        ${sections}
+      </ul>
+    `;
+  return floatingWindow;
 };
 
 class Chart {
@@ -321,11 +365,15 @@ class Chart {
     const viewShift = w - dragWidth;
     this._state = {
       exclude: {},
+      floatingWindow: {
+        elem: null,
+        dateElem: null
+      },
       drag: {
         active: false,
         resize: false,
         leftArrow: false,
-        dragger: null,
+        dragger: createDragger(dragWidth),
         elem: null,
         initialWidth: dragWidth,
         width: dragWidth,
@@ -333,10 +381,17 @@ class Chart {
         marginLeft: viewShift
       }
     };
+
     const fragment = document.createDocumentFragment();
     const wrapper = document.createElement("div");
-    const dragger = createDragger(dragWidth);
-    this._state.drag.dragger = dragger;
+    const dragger = this._state.drag.dragger;
+    this._state.floatingWindow.elem = createFloatingWindow(
+      this._data,
+      this._rgbColors
+    );
+    this._state.floatingWindow.dateElem = this._state.floatingWindow.elem.querySelector(
+      ".floating-window__date"
+    );
 
     setTransform(dragger.style, viewShift);
     this._transitions.xShift = viewShift / this._minimap.width;
@@ -346,6 +401,7 @@ class Chart {
     wrapper.appendChild(dragger);
     fragment.appendChild(this._chart.canvas);
     fragment.appendChild(this._float.canvas);
+    fragment.appendChild(this._state.floatingWindow.elem);
     fragment.appendChild(wrapper);
     this._container.appendChild(fragment);
 
@@ -409,19 +465,26 @@ class Chart {
     context.beginPath();
     context.lineWidth = 1;
     context.strokeStyle =
-      colors.ChartSeparator[_$TelegramCharts.modeSwitcherData.mode];
+      colors.FloatingLine[_$TelegramCharts.modeSwitcherData.mode];
 
     context.moveTo(x, 0);
     context.lineTo(x, height - DATE_MARGIN * 2);
     context.stroke();
 
     const yScale = this._getVerticalParams(this._chart);
+    let dates;
 
     for (let column of this._data.columns) {
       const type = column[0];
-      const y = height - column[index] * yScale - DATE_MARGIN * 2;
+
+      if (!isLine(this._data.types[type])) {
+        dates = column;
+        continue;
+      }
 
       if (isLine(this._data.types[type]) && opacity[type]) {
+        const y = height - column[index] * yScale - DATE_MARGIN * 2;
+        this._updateFloatingWindow(type, column[index], dates[index], x);
         context.strokeStyle = rgbToString(this._rgbColors[type], 1);
         context.beginPath();
         context.arc(x, y, 5, 0, 2 * Math.PI, false);
@@ -434,9 +497,22 @@ class Chart {
     }
   }
 
+  _updateFloatingWindow(type, value, date, x) {
+    const {
+      floatingWindow: { elem, dateElem }
+    } = this._state;
+    elem.className = "floating-window";
+    dateElem.innerHTML = `${toWeekday(date)}, ${toDateString(date)}`;
+    const countElem = elem.querySelector(`.${getLabelClass(type)}`);
+    countElem.innerHTML = value;
+    elem.style = `transform: translateX(${x + 15}px)`;
+  }
+
   _floatMouseLeave() {
     setTimeout(() => {
       this._clear(this._float.canvas);
+      this._state.floatingWindow.elem.className =
+        "floating-window visually-hidden";
     }, 100);
   }
 
@@ -618,16 +694,12 @@ class Chart {
 
   _drawMinimap() {
     const { context, height, width } = this._minimap;
+    const { drag } = this._state;
     context.fillStyle =
       colors.MinimapBackground[_$TelegramCharts.modeSwitcherData.mode];
     this._renderChart(this._minimap, this._getHorisontalParams(this._minimap));
-    context.fillRect(0, 0, this._state.drag.marginLeft, height);
-    context.fillRect(
-      this._state.drag.marginLeft + this._state.drag.width,
-      0,
-      width,
-      height
-    );
+    context.fillRect(0, 0, drag.marginLeft, height);
+    context.fillRect(drag.marginLeft + drag.width, 0, width, height);
   }
 
   _renderAdditionalInfo({ context, width, height }) {
@@ -754,7 +826,7 @@ class Chart {
             context.fillStyle =
               colors.ChartText[_$TelegramCharts.modeSwitcherData.mode];
 
-            context.fillText(toDateString(dates[i]), x, height);
+            context.fillText(toDateString(dates[i]), x - 15, height);
 
             context.lineWidth = savedWidth;
             context.fillStyle = savedFillStyle;

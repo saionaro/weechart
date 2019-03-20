@@ -4,7 +4,6 @@
  * * Touch events
  * * Optimize floating window rendering
  * * Refactor code
- * * Improve yAxis animation
  */
 
 const VERBOSE = false;
@@ -15,7 +14,7 @@ const SCALE_RATE = 1;
 const MINIMAP_HEIGHT = 75;
 const INITIAL_X_SCALE = 5;
 const ANIMATION_STEPS = 16;
-const Y_AXIS_ANIMATION_SHIFT = 200;
+const Y_AXIS_ANIMATION_SHIFT = 180;
 const DATE_MARGIN = 16;
 const HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
 const PIXEL_RATIO = (() => {
@@ -174,8 +173,6 @@ const hexToRgb = hex => {
 const rgbToString = (rgb, alpha = 1) =>
   `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
 
-const isLine = type => type === dataTypes.Line;
-
 const calculateVerticalRatio = (maxValue, height) => {
   if (maxValue > height) {
     return height / maxValue;
@@ -322,6 +319,8 @@ const getColor = color => colors[color][_$TelegramCharts.modeSwitcherData.mode];
 class Chart {
   constructor(container, data, { w, h }) {
     this._data = data;
+    this._lines = [];
+    this._dates = null;
     this._dataCount = data.columns[0].length - 1;
 
     this._chart = createCanvasObject(cavasType.Chart, w, h);
@@ -361,9 +360,12 @@ class Chart {
     for (let column of data.columns) {
       const type = column[0];
 
-      if (isLine(this._data.types[type])) {
+      if (this._data.types[type] === dataTypes.Line) {
         this._rgbColors[type] = hexToRgb(this._data.colors[type]);
         this._transitions.chartsOpacity[type] = 1;
+        this._lines.push(column);
+      } else {
+        this._dates = column;
       }
     }
 
@@ -464,7 +466,7 @@ class Chart {
       drag: { active }
     } = this._state;
     if (active) return;
-    const { scale, shift, window } = this._getHorisontalParams(this._chart);
+    const { scale, shift, window } = this._getXParams(this._chart);
     const cursorX = getCursorXPosition(this._float.canvas, event);
     const selected = Math.ceil(cursorX / scale + window[0]);
     this._drawFloatingLine(selected, selected * scale + shift);
@@ -483,8 +485,7 @@ class Chart {
     context.lineTo(x, height - DATE_MARGIN * 2);
     context.stroke();
 
-    const yScale = this._getVerticalParams(this._chart);
-    let dates;
+    const yScale = this._getYParams(this._chart);
 
     const data = {
       date: 0,
@@ -492,18 +493,13 @@ class Chart {
       values: {}
     };
 
-    for (let column of this._data.columns) {
+    for (let column of this._lines) {
       const type = column[0];
-
-      if (!isLine(this._data.types[type])) {
-        dates = column;
-        continue;
-      }
 
       if (chartsOpacity[type]) {
         const y = height - column[index] * yScale - DATE_MARGIN * 2;
 
-        data.date = dates[index];
+        data.date = this._dates[index];
         data.values[type] = column[index];
 
         context.strokeStyle = rgbToString(this._rgbColors[type], 1);
@@ -554,27 +550,27 @@ class Chart {
   _findAllExtremums() {
     this._findExtremums(
       this._localExtremums,
-      this._getHorisontalParams(this._chart).window
+      this._getXParams(this._chart).window
     );
     this._findExtremums(this._globalExtremums);
   }
 
   _findExtremums(store, range) {
-    const { _data, _state } = this;
+    const { _lines, _state } = this;
     let max = -Infinity;
     let min = Infinity;
     let from = 1;
-    let to = _data.columns[0].length;
+    let to = _lines[0].length;
 
     if (range) {
       from = range[0] + 1;
       to = range[1] + 1;
     }
 
-    for (let column of _data.columns) {
+    for (let column of _lines) {
       const type = column[0];
 
-      if (isLine(_data.types[type]) && !_state.exclude[type]) {
+      if (!_state.exclude[type]) {
         for (let i = from; i < to; i++) {
           if (column[i] > max) {
             max = column[i];
@@ -623,12 +619,10 @@ class Chart {
 
     if (!drag.active || !movementX) return;
 
-    const maxPadding = this._minimap.width - drag.width;
-
     if (drag.resize) {
       return this._handleResize(movementX);
     }
-
+    const maxPadding = this._minimap.width - drag.width;
     const sum = drag.marginLeft + movementX;
     const val = sum < 0 ? 0 : sum > maxPadding ? maxPadding : sum;
     setTransform(drag.dragger.style, val);
@@ -667,7 +661,7 @@ class Chart {
       return;
     }
 
-    return this._changeDragWidth(delta);
+    this._changeDragWidth(delta);
   }
 
   _changeDragWidth(delta) {
@@ -679,7 +673,7 @@ class Chart {
     drag.dragger.style.width = `${changedWidth}px`;
 
     this._pushAnimation(
-      this._animateHorisontalScale(
+      this._animateHorisontal(
         record.xRatioModifer,
         deltaRatio * record.xRatioModifer
       )
@@ -695,9 +689,7 @@ class Chart {
       extremums.prev.max !== extremums.current.max ||
       extremums.prev.min !== extremums.current.min
     ) {
-      this._pushAnimation(
-        this._animateVertical(this._findVerticalRatioDelta())
-      );
+      this._pushAnimation(this._animateVertical(this._findYDeltas()));
       this._pushAnimation(
         this._animateYAxis(extremums.prev.max < extremums.current.max)
       );
@@ -727,95 +719,104 @@ class Chart {
 
   _drawChart() {
     this._chart.context.lineWidth = 1;
-    this._renderAdditionalInfo(this._chart);
+    this._renderLines(this._chart);
     this._chart.context.lineWidth = 2;
-    const xParams = this._getHorisontalParams(this._chart);
+    const xParams = this._getXParams(this._chart);
     this._renderChart(this._chart, xParams);
-    this._renderLabels(this._chart, xParams);
+    this._renderYValues(this._chart, xParams);
   }
 
   _drawMinimap() {
     const { context, height, width } = this._minimap;
     const { drag } = this._state;
     context.fillStyle = getColor("MinimapBackground");
-    this._renderChart(this._minimap, this._getHorisontalParams(this._minimap));
+    this._renderChart(this._minimap, this._getXParams(this._minimap));
     context.fillRect(0, 0, drag.marginLeft, height);
     context.fillRect(drag.marginLeft + drag.width, 0, width, height);
   }
 
-  _renderAdditionalInfo({ context, width, height }) {
-    const stepSize = height / LINES_COUNT;
-    const color = getColor("ChartSeparator");
+  _renderLines({ context, width, height }) {
     const {
+      _localExtremums: { current },
       _transitions: { yAxis }
     } = this;
+    const stepSize = height / LINES_COUNT;
+    const color = getColor("ChartSeparator");
+    const maxHeight = height - DATE_MARGIN;
 
     context.beginPath();
 
-    for (let i = 0; i < LINES_COUNT; i++) {
-      const shift = height - DATE_MARGIN - i * stepSize;
-      const isZero = i === 0;
-      const y = shift + (isZero ? 0 : yAxis.shift);
+    if (current.max !== -Infinity) {
+      for (let i = 1; i < LINES_COUNT; i++) {
+        const shift = maxHeight - i * stepSize;
+        const y = shift + yAxis.shift;
 
-      context.strokeStyle = rgbToString(color, isZero ? 1 : yAxis.opacity);
-      context.moveTo(0, y);
-      context.lineTo(width, y);
-
-      if (yAxis.opacity < 1 && !isZero) {
-        context.strokeStyle = rgbToString(color, 1 - yAxis.opacity);
-        const y =
-          shift -
-          (Y_AXIS_ANIMATION_SHIFT * (yAxis.toDown ? -1 : 1) - yAxis.shift);
-
-        if (y !== height) {
+        if (y <= maxHeight) {
+          context.strokeStyle = rgbToString(color, yAxis.opacity);
           context.moveTo(0, y);
           context.lineTo(width, y);
         }
+
+        if (yAxis.opacity < 1) {
+          context.strokeStyle = rgbToString(color, 1 - yAxis.opacity);
+          const y =
+            shift -
+            (Y_AXIS_ANIMATION_SHIFT * (yAxis.toDown ? -1 : 1) - yAxis.shift);
+
+          if (y < maxHeight) {
+            context.moveTo(0, y);
+            context.lineTo(width, y);
+          }
+        }
       }
+      context.strokeStyle = rgbToString(color, 1);
+      context.moveTo(0, maxHeight);
+      context.lineTo(width, maxHeight);
     }
 
     context.stroke();
     context.closePath();
   }
 
-  _renderLabels({ context, height }, { shift }) {
+  _renderYValues({ context, height }, { shift }) {
     const {
-      _localExtremums: extremums,
+      _localExtremums: { current, prev },
       _transitions: { yAxis }
     } = this;
     const stepSize = height / LINES_COUNT;
     const color = getColor("ChartText");
+    const maxHeight = height - DATE_MARGIN - 6;
 
     context.lineWidth = 1;
 
-    if (extremums.current.max !== -Infinity) {
-      for (let i = 0; i < LINES_COUNT; i++) {
-        const yShift = height - DATE_MARGIN - 6 - i * stepSize;
-        const isZero = i === 0;
-        const y = yShift + (isZero ? 0 : yAxis.shift);
+    if (current.max !== -Infinity) {
+      for (let i = 1; i < LINES_COUNT; i++) {
+        const yShift = maxHeight - i * stepSize;
+        const y = yShift + yAxis.shift;
+        const part = i / LINES_COUNT;
 
-        context.fillStyle = rgbToString(color, isZero ? 1 : yAxis.opacity);
-        context.fillText(
-          Math.round(extremums.current.max * (i / LINES_COUNT)),
-          -shift,
-          y
-        );
+        if (y < maxHeight) {
+          context.fillStyle = rgbToString(color, yAxis.opacity);
+          context.fillText(Math.round(current.max * part), -shift, y);
+        }
 
-        if (yAxis.opacity < 1 && !isZero) {
-          context.fillStyle = rgbToString(color, 1 - yAxis.opacity);
+        if (yAxis.opacity < 1) {
+          const yCoord =
+            y -
+            (Y_AXIS_ANIMATION_SHIFT * (yAxis.toDown ? -1 : 1) - yAxis.shift);
 
-          context.fillText(
-            Math.round(extremums.prev.max * (i / LINES_COUNT)),
-            -shift,
-            yShift -
-              (Y_AXIS_ANIMATION_SHIFT * (yAxis.toDown ? -1 : 1) - yAxis.shift)
-          );
+          if (yCoord < maxHeight) {
+            context.fillStyle = rgbToString(color, 1 - yAxis.opacity);
+            context.fillText(Math.round(prev.max * part), -shift, yCoord);
+          }
         }
       }
+      context.fillStyle = rgbToString(color, 1);
+      context.fillText(0, -shift, maxHeight);
     }
   }
 
-  _getHorisontalParams({ width, type }) {
+  _getXParams({ width, type }) {
     const {
       _transitions: { xShift, [type]: record },
       _dataCount: count
@@ -838,10 +839,10 @@ class Chart {
     return params;
   }
 
-  _getVerticalParams({ height, type }) {
-    const { _transitions, _localExtremums, _globalExtremums } = this;
+  _getYParams({ height, type }) {
+    const { _transitions } = this;
     const usedExtremums =
-      type === cavasType.Chart ? _localExtremums : _globalExtremums;
+      type === cavasType.Chart ? this._localExtremums : this._globalExtremums;
 
     return (
       calculateVerticalRatio(usedExtremums.current.max, height) +
@@ -852,11 +853,11 @@ class Chart {
   _renderChart(canvasParams, { scale, shift }) {
     const { context, width, height, type: canvasType } = canvasParams;
     const {
-      _data: data,
+      _lines: lines,
       _transitions: { chartsOpacity }
     } = this;
     const isChart = canvasType === cavasType.Chart;
-    const yScale = this._getVerticalParams(canvasParams);
+    const yScale = this._getYParams(canvasParams);
 
     if (shift && isChart) {
       context.translate(shift, 0);
@@ -865,20 +866,14 @@ class Chart {
     const savedWidth = context.lineWidth;
     const savedFillStyle = context.fillStyle;
     const savedTextAlign = context.textAlign;
+
     let datesPainted = false;
-    let dates;
 
     const everyCount = Math.round(100 / scale);
 
-    for (let column of data.columns) {
+    for (let column of lines) {
       const type = column[0];
       const opacityValue = chartsOpacity[type];
-      const isDates = !isLine(data.types[type]);
-
-      if (isDates) {
-        dates = column;
-        continue;
-      }
 
       if (opacityValue !== 0) {
         context.beginPath();
@@ -903,7 +898,7 @@ class Chart {
             context.lineWidth = 1;
             context.fillStyle = rgbToString(getColor("ChartText"));
 
-            context.fillText(toDateString(dates[i]), x, height);
+            context.fillText(toDateString(this._dates[i]), x, height);
 
             context.lineWidth = savedWidth;
             context.fillStyle = savedFillStyle;
@@ -922,25 +917,25 @@ class Chart {
 
   _renderButtons() {
     let items = "";
-    const { _data: data, _container: container } = this;
+    const { _data: data, _container: container, _lines } = this;
 
-    for (let type in data.types) {
-      if (isLine(data.types[type])) {
-        items += `<li class="charts-selector__item">
-          <label class="checkbox" style="color: ${rgbToString(
-            this._rgbColors[type]
-          )}">
-            <input
-              type="checkbox"
-              class="checkbox__input visually-hidden"
-              name="${type}"
-              checked
-            >
-            ${CheckedIcon}
-            <span class="checkbox__title">${data.names[type]}</span>
-          </label>
-        </li>`;
-      }
+    for (let column of _lines) {
+      const type = column[0];
+
+      items += `<li class="charts-selector__item">
+        <label class="checkbox" style="color: ${rgbToString(
+          this._rgbColors[type]
+        )}">
+          <input
+            type="checkbox"
+            class="checkbox__input visually-hidden"
+            name="${type}"
+            checked
+          >
+          ${CheckedIcon}
+          <span class="checkbox__title">${data.names[type]}</span>
+        </label>
+      </li>`;
     }
 
     const tempContainer = document.createElement("div");
@@ -959,8 +954,8 @@ class Chart {
     this._state.exclude[target.name] = !target.checked;
     this._hideFloatingWindowLabel(target.name, !target.checked);
     this._findAllExtremums();
+    this._pushAnimation(this._animateVertical(this._findYDeltas()));
 
-    this._pushAnimation(this._animateVertical(this._findVerticalRatioDelta()));
     if (this._localExtremums.prev.max !== this._localExtremums.current.max) {
       this._pushAnimation(
         this._animateYAxis(
@@ -976,10 +971,9 @@ class Chart {
     this._animations[animation.tag] = animation.hook;
   }
 
-  _findVerticalRatioDelta() {
+  _findYDeltas() {
     const glob = this._globalExtremums;
     const local = this._localExtremums;
-
     const deltas = {};
 
     for (const canvasType of chartTypesList) {
@@ -1036,8 +1030,8 @@ class Chart {
     };
   }
 
-  _animateHorisontalScale(oldVal, newVal) {
-    const tag = "_animateHorisontalScale";
+  _animateHorisontal(oldVal, newVal) {
+    const tag = "_animateHorisontal";
     const step = (newVal - oldVal) / ANIMATION_STEPS;
     const { [cavasType.Chart]: record } = this._transitions;
     record.xRatioModifer = newVal;
@@ -1114,9 +1108,9 @@ class Chart {
         }
 
         if (yAxis.opacity >= 1) {
-          delete this._animations[tag];
           yAxis.opacity = 1;
           yAxis.shift = 0;
+          delete this._animations[tag];
         }
       },
       tag

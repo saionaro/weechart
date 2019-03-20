@@ -1,7 +1,6 @@
 /**
  * TODO
  * * Animate dates
- * * Animate y values and lines
  * * Touch events
  * * Optimize floating window rendering
  * * Refactor code
@@ -15,6 +14,7 @@ const SCALE_RATE = 1;
 const MINIMAP_HEIGHT = 75;
 const INITIAL_X_SCALE = 5;
 const ANIMATION_STEPS = 16;
+const Y_AXIS_ANIMATION_SHIFT = 200;
 const DATE_MARGIN = 16;
 const HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
 const PIXEL_RATIO = (() => {
@@ -113,8 +113,8 @@ const chartTypesList = [cavasType.Minimap, cavasType.Chart];
 
 const colors = {
   ChartSeparator: {
-    day: "#ebf0f3",
-    night: "#273545"
+    day: { r: 235, g: 240, b: 243 },
+    night: { r: 39, g: 53, b: 69 }
   },
   FloatingLine: {
     day: "#dee6eb",
@@ -125,8 +125,8 @@ const colors = {
     night: "#222f3f"
   },
   ChartText: {
-    day: "#94a2ab",
-    night: "#506779"
+    day: { r: 148, g: 162, b: 171 },
+    night: { r: 80, g: 103, b: 121 }
   },
   MinimapBackground: {
     day: "rgba(240, 247, 252, 0.6)",
@@ -345,7 +345,12 @@ class Chart {
         yRatioModifer: 0,
         xRatioModifer: INITIAL_X_SCALE
       },
-      opacity: {},
+      chartsOpacity: {},
+      yAxis: {
+        opacity: 1,
+        toDown: false,
+        shift: 0
+      },
       xShift: 0
     };
 
@@ -354,7 +359,7 @@ class Chart {
 
       if (isLine(this._data.types[type])) {
         this._rgbColors[type] = hexToRgb(this._data.colors[type]);
-        this._transitions.opacity[type] = 1;
+        this._transitions.chartsOpacity[type] = 1;
       }
     }
 
@@ -458,7 +463,7 @@ class Chart {
 
   _drawFloatingLine(index, x) {
     const { canvas, context, height } = this._float;
-    const { opacity } = this._transitions;
+    const { chartsOpacity } = this._transitions;
     this._clear(canvas);
 
     context.beginPath();
@@ -487,7 +492,7 @@ class Chart {
         continue;
       }
 
-      if (opacity[type]) {
+      if (chartsOpacity[type]) {
         const y = height - column[index] * yScale - DATE_MARGIN * 2;
 
         data.date = dates[index];
@@ -665,6 +670,9 @@ class Chart {
       this._pushAnimation(
         this._animateVertical(this._findVerticalRatioDelta())
       );
+      this._pushAnimation(
+        this._animateYAxis(extremums.prev.max < extremums.current.max)
+      );
     }
   }
 
@@ -727,15 +735,35 @@ class Chart {
 
   _renderAdditionalInfo({ context, width, height }) {
     const stepSize = height / LINES_COUNT;
+    const {
+      _transitions: { yAxis }
+    } = this;
 
     context.beginPath();
-    context.strokeStyle =
-      colors.ChartSeparator[_$TelegramCharts.modeSwitcherData.mode];
 
     for (let i = 0; i < LINES_COUNT; i++) {
       const shift = height - i * stepSize;
-      context.moveTo(0, shift - DATE_MARGIN);
-      context.lineTo(width, shift - DATE_MARGIN);
+      const isZero = i === 0;
+
+      context.strokeStyle = rgbToString(
+        colors.ChartSeparator[_$TelegramCharts.modeSwitcherData.mode],
+        isZero ? 1 : yAxis.opacity
+      );
+
+      const y = shift - DATE_MARGIN + (isZero ? 0 : yAxis.shift);
+
+      context.moveTo(0, y);
+      context.lineTo(width, y);
+
+      if (yAxis.opacity < 1 && !isZero) {
+        context.strokeStyle = rgbToString(
+          colors.ChartSeparator[_$TelegramCharts.modeSwitcherData.mode],
+          1 - yAxis.opacity
+        );
+        const y = shift - DATE_MARGIN - (Y_AXIS_ANIMATION_SHIFT - yAxis.shift);
+        context.moveTo(0, y);
+        context.lineTo(width, y);
+      }
     }
 
     context.stroke();
@@ -743,21 +771,44 @@ class Chart {
   }
 
   _renderLabels({ context, height }, { shift }) {
-    const { _localExtremums: extremums } = this;
+    const {
+      _localExtremums: extremums,
+      _transitions: { yAxis }
+    } = this;
     const stepSize = height / LINES_COUNT;
 
     context.lineWidth = 1;
-    context.fillStyle =
-      colors.ChartText[_$TelegramCharts.modeSwitcherData.mode];
 
     if (extremums.current.max !== -Infinity) {
       for (let i = 0; i < LINES_COUNT; i++) {
         const yShift = height - i * stepSize;
+        const isZero = i === 0;
+
+        context.fillStyle = rgbToString(
+          colors.ChartText[_$TelegramCharts.modeSwitcherData.mode],
+          isZero ? 1 : yAxis.opacity
+        );
+
+        const y = yShift - 6 - DATE_MARGIN + (isZero ? 0 : yAxis.shift);
+
         context.fillText(
           Math.round(extremums.current.max * (i / LINES_COUNT)),
           -shift,
-          yShift - 6 - DATE_MARGIN
+          y
         );
+
+        if (yAxis.opacity < 1 && !isZero) {
+          context.fillStyle = rgbToString(
+            colors.ChartText[_$TelegramCharts.modeSwitcherData.mode],
+            1 - yAxis.opacity
+          );
+
+          context.fillText(
+            Math.round(extremums.prev.max * (i / LINES_COUNT)),
+            -shift,
+            yShift - 6 - DATE_MARGIN - (Y_AXIS_ANIMATION_SHIFT - yAxis.shift)
+          );
+        }
       }
     }
   }
@@ -800,7 +851,7 @@ class Chart {
     const { context, width, height, type: canvasType } = canvasParams;
     const {
       _data: data,
-      _transitions: { opacity }
+      _transitions: { chartsOpacity }
     } = this;
     const isChart = canvasType === cavasType.Chart;
     const yScale = this._getVerticalParams(canvasParams);
@@ -818,7 +869,7 @@ class Chart {
 
     for (let column of data.columns) {
       const type = column[0];
-      const opacityValue = opacity[type];
+      const opacityValue = chartsOpacity[type];
       const isDates = !isLine(data.types[type]);
 
       if (isDates) {
@@ -846,8 +897,9 @@ class Chart {
 
           if (isChart && !datesPainted && !(i % everyCount)) {
             context.lineWidth = 1;
-            context.fillStyle =
-              colors.ChartText[_$TelegramCharts.modeSwitcherData.mode];
+            context.fillStyle = rgbToString(
+              colors.ChartText[_$TelegramCharts.modeSwitcherData.mode]
+            );
 
             context.fillText(toDateString(dates[i]), x - 15, height);
 
@@ -904,7 +956,16 @@ class Chart {
     this._state.exclude[target.name] = !target.checked;
     this._hideFloatingWindowLabel(target.name, !target.checked);
     this._findAllExtremums();
+
     this._pushAnimation(this._animateVertical(this._findVerticalRatioDelta()));
+    if (this._localExtremums.prev.max !== this._localExtremums.current.max) {
+      this._pushAnimation(
+        this._animateYAxis(
+          this._localExtremums.prev.max < this._localExtremums.current.max
+        )
+      );
+    }
+
     this._animationLoop();
   }
 
@@ -1006,12 +1067,51 @@ class Chart {
         if (VERBOSE) {
           console.log("Hide chart");
         }
-        const record = this._transitions.opacity;
+        const record = this._transitions.chartsOpacity;
         record[type] += value ? 0.08 : -0.08;
 
         if ((record[type] <= 0 && !value) || (record[type] >= 1 && value)) {
           delete this._animations[tag];
           record[type] = value ? 1 : 0;
+        }
+      },
+      tag
+    };
+  }
+
+  _animateYAxis(toDown) {
+    const tag = "_animateYAxis";
+
+    const {
+      _transitions: { yAxis }
+    } = this;
+
+    yAxis.toDown = toDown;
+    yAxis.opacity = 0;
+    yAxis.shift = Y_AXIS_ANIMATION_SHIFT * (toDown ? -1 : 1);
+
+    return {
+      hook: () => {
+        console.log("Animate y axis");
+
+        if (yAxis.opacity < 1) {
+          yAxis.opacity += 0.08;
+        }
+
+        if (toDown) {
+          if (yAxis.shift < 0) {
+            yAxis.shift += (20 / ANIMATION_STEPS) * 8;
+          } else return;
+        } else {
+          if (yAxis.shift > 0) {
+            yAxis.shift -= (20 / ANIMATION_STEPS) * 8;
+          } else return;
+        }
+
+        if (yAxis.opacity >= 1) {
+          delete this._animations[tag];
+          yAxis.opacity = 1;
+          yAxis.shift = 0;
         }
       },
       tag

@@ -273,14 +273,15 @@ const createCanvasObject = (type, width, height) => ({
 
 const createDragger = width => {
   const dragger = document.createElement("div");
+  const arrowLeft = document.createElement("div");
+  const arrowRight = document.createElement("div");
+
   dragger.className = "chart__minimap-dragger hide-selection";
   dragger.style.height = `${MINIMAP_HEIGHT - 4}px`;
   dragger.style.width = `${width}px`;
 
-  const arrowLeft = document.createElement("div");
   arrowLeft.className =
     "chart__minimap-dragger-arrow chart__minimap-dragger-arrow--left";
-  const arrowRight = document.createElement("div");
   arrowRight.className =
     "chart__minimap-dragger-arrow chart__minimap-dragger-arrow--right";
 
@@ -315,6 +316,8 @@ const createFloatingWindow = (data, colors) => {
     `;
   return floatingWindow;
 };
+
+const getColor = color => colors[color][_$TelegramCharts.modeSwitcherData.mode];
 
 class Chart {
   constructor(container, data, { w, h }) {
@@ -416,6 +419,7 @@ class Chart {
     this._moveDrag = this._moveDrag.bind(this);
     this._endDrag = this._endDrag.bind(this);
     this._floatMouseMove = throttle(this._floatMouseMove.bind(this), 60);
+    this._checkYScaleChange = throttle(this._checkYScaleChange.bind(this), 100);
     this._floatMouseLeave = this._floatMouseLeave.bind(this);
 
     dragger.addEventListener("mousedown", this._startDrag, listenerOpts);
@@ -456,6 +460,10 @@ class Chart {
   }
 
   _floatMouseMove(event) {
+    const {
+      drag: { active }
+    } = this._state;
+    if (active) return;
     const { scale, shift, window } = this._getHorisontalParams(this._chart);
     const cursorX = getCursorXPosition(this._float.canvas, event);
     const selected = Math.ceil(cursorX / scale + window[0]);
@@ -469,8 +477,7 @@ class Chart {
 
     context.beginPath();
     context.lineWidth = 1;
-    context.strokeStyle =
-      colors.FloatingLine[_$TelegramCharts.modeSwitcherData.mode];
+    context.strokeStyle = getColor("FloatingLine");
 
     context.moveTo(x, 0);
     context.lineTo(x, height - DATE_MARGIN * 2);
@@ -502,8 +509,7 @@ class Chart {
         context.strokeStyle = rgbToString(this._rgbColors[type], 1);
         context.beginPath();
         context.arc(x, y, 5, 0, 2 * Math.PI, false);
-        context.fillStyle =
-          colors.ChartBackground[_$TelegramCharts.modeSwitcherData.mode];
+        context.fillStyle = getColor("ChartBackground");
         context.fill();
         context.lineWidth = 2;
         context.stroke();
@@ -612,43 +618,15 @@ class Chart {
     this._animationLoop();
   }
 
-  _moveDrag({ pageX, movementX }) {
+  _moveDrag({ movementX }) {
     const { drag } = this._state;
 
-    if (!drag.active) return;
-
-    var moveX = pageX - drag.downX;
-
-    if (Math.abs(moveX) < 4 || movementX === 0) return;
+    if (!drag.active || !movementX) return;
 
     const maxPadding = this._minimap.width - drag.width;
 
     if (drag.resize) {
-      if (drag.leftArrow) {
-        if (
-          drag.width - movementX < drag.initialWidth / 2 ||
-          drag.marginLeft + movementX < 0
-        ) {
-          return;
-        }
-
-        const newVal = drag.marginLeft + movementX;
-        const newShift = newVal / this._minimap.width;
-        drag.marginLeft = newVal;
-        setTransform(drag.dragger.style, newVal);
-        this._transitions.xShift = newShift;
-
-        return this._changeDragWidth(-movementX);
-      }
-
-      if (
-        drag.width + movementX < drag.initialWidth / 2 ||
-        drag.marginLeft + movementX > maxPadding
-      ) {
-        return;
-      }
-
-      return this._changeDragWidth(movementX);
+      return this._handleResize(movementX);
     }
 
     const sum = drag.marginLeft + movementX;
@@ -657,6 +635,55 @@ class Chart {
     drag.marginLeft = val;
 
     this._transitions.xShift = val / this._minimap.width;
+    this._checkYScaleChange();
+  }
+
+  _handleResize(delta) {
+    const { drag } = this._state;
+
+    if (drag.leftArrow) {
+      if (
+        drag.width - delta < drag.initialWidth / 2 ||
+        drag.marginLeft + delta < 0
+      ) {
+        return;
+      }
+
+      const newVal = drag.marginLeft + delta;
+      const newShift = newVal / this._minimap.width;
+      drag.marginLeft = newVal;
+      setTransform(drag.dragger.style, newVal);
+      this._transitions.xShift = newShift;
+
+      return this._changeDragWidth(-delta);
+    }
+
+    const maxPadding = this._minimap.width - drag.width;
+
+    if (
+      drag.width + delta < drag.initialWidth / 2 ||
+      drag.marginLeft + delta > maxPadding
+    ) {
+      return;
+    }
+
+    return this._changeDragWidth(delta);
+  }
+
+  _changeDragWidth(delta) {
+    const { [cavasType.Chart]: record } = this._transitions;
+    const { drag } = this._state;
+    const changedWidth = drag.width + delta;
+    const deltaRatio = drag.width / changedWidth;
+    drag.width = changedWidth;
+    drag.dragger.style.width = `${changedWidth}px`;
+
+    this._pushAnimation(
+      this._animateHorisontalScale(
+        record.xRatioModifer,
+        deltaRatio * record.xRatioModifer
+      )
+    );
     this._checkYScaleChange();
   }
 
@@ -675,23 +702,6 @@ class Chart {
         this._animateYAxis(extremums.prev.max < extremums.current.max)
       );
     }
-  }
-
-  _changeDragWidth(delta) {
-    const { [cavasType.Chart]: record } = this._transitions;
-    const { drag } = this._state;
-    const changedWidth = drag.width + delta;
-    const deltaRatio = drag.width / changedWidth;
-    drag.width = changedWidth;
-    drag.dragger.style.width = `${changedWidth}px`;
-
-    this._pushAnimation(
-      this._animateHorisontalScale(
-        record.xRatioModifer,
-        deltaRatio * record.xRatioModifer
-      )
-    );
-    this._checkYScaleChange();
   }
 
   _endDrag() {
@@ -727,8 +737,7 @@ class Chart {
   _drawMinimap() {
     const { context, height, width } = this._minimap;
     const { drag } = this._state;
-    context.fillStyle =
-      colors.MinimapBackground[_$TelegramCharts.modeSwitcherData.mode];
+    context.fillStyle = getColor("MinimapBackground");
     this._renderChart(this._minimap, this._getHorisontalParams(this._minimap));
     context.fillRect(0, 0, drag.marginLeft, height);
     context.fillRect(drag.marginLeft + drag.width, 0, width, height);
@@ -736,6 +745,7 @@ class Chart {
 
   _renderAdditionalInfo({ context, width, height }) {
     const stepSize = height / LINES_COUNT;
+    const color = getColor("ChartSeparator");
     const {
       _transitions: { yAxis }
     } = this;
@@ -743,27 +753,24 @@ class Chart {
     context.beginPath();
 
     for (let i = 0; i < LINES_COUNT; i++) {
-      const shift = height - i * stepSize;
+      const shift = height - DATE_MARGIN - i * stepSize;
       const isZero = i === 0;
+      const y = shift + (isZero ? 0 : yAxis.shift);
 
-      context.strokeStyle = rgbToString(
-        colors.ChartSeparator[_$TelegramCharts.modeSwitcherData.mode],
-        isZero ? 1 : yAxis.opacity
-      );
-
-      const y = shift - DATE_MARGIN + (isZero ? 0 : yAxis.shift);
-
+      context.strokeStyle = rgbToString(color, isZero ? 1 : yAxis.opacity);
       context.moveTo(0, y);
       context.lineTo(width, y);
 
       if (yAxis.opacity < 1 && !isZero) {
-        context.strokeStyle = rgbToString(
-          colors.ChartSeparator[_$TelegramCharts.modeSwitcherData.mode],
-          1 - yAxis.opacity
-        );
-        const y = shift - DATE_MARGIN - (Y_AXIS_ANIMATION_SHIFT - yAxis.shift);
-        context.moveTo(0, y);
-        context.lineTo(width, y);
+        context.strokeStyle = rgbToString(color, 1 - yAxis.opacity);
+        const y =
+          shift -
+          (Y_AXIS_ANIMATION_SHIFT * (yAxis.toDown ? -1 : 1) - yAxis.shift);
+
+        if (y !== height) {
+          context.moveTo(0, y);
+          context.lineTo(width, y);
+        }
       }
     }
 
@@ -777,21 +784,17 @@ class Chart {
       _transitions: { yAxis }
     } = this;
     const stepSize = height / LINES_COUNT;
+    const color = getColor("ChartText");
 
     context.lineWidth = 1;
 
     if (extremums.current.max !== -Infinity) {
       for (let i = 0; i < LINES_COUNT; i++) {
-        const yShift = height - i * stepSize;
+        const yShift = height - DATE_MARGIN - 6 - i * stepSize;
         const isZero = i === 0;
+        const y = yShift + (isZero ? 0 : yAxis.shift);
 
-        context.fillStyle = rgbToString(
-          colors.ChartText[_$TelegramCharts.modeSwitcherData.mode],
-          isZero ? 1 : yAxis.opacity
-        );
-
-        const y = yShift - 6 - DATE_MARGIN + (isZero ? 0 : yAxis.shift);
-
+        context.fillStyle = rgbToString(color, isZero ? 1 : yAxis.opacity);
         context.fillText(
           Math.round(extremums.current.max * (i / LINES_COUNT)),
           -shift,
@@ -799,15 +802,13 @@ class Chart {
         );
 
         if (yAxis.opacity < 1 && !isZero) {
-          context.fillStyle = rgbToString(
-            colors.ChartText[_$TelegramCharts.modeSwitcherData.mode],
-            1 - yAxis.opacity
-          );
+          context.fillStyle = rgbToString(color, 1 - yAxis.opacity);
 
           context.fillText(
             Math.round(extremums.prev.max * (i / LINES_COUNT)),
             -shift,
-            yShift - 6 - DATE_MARGIN - (Y_AXIS_ANIMATION_SHIFT - yAxis.shift)
+            yShift -
+              (Y_AXIS_ANIMATION_SHIFT * (yAxis.toDown ? -1 : 1) - yAxis.shift)
           );
         }
       }
@@ -900,9 +901,7 @@ class Chart {
           if (isChart && !datesPainted && !(i % everyCount)) {
             context.textAlign = "center";
             context.lineWidth = 1;
-            context.fillStyle = rgbToString(
-              colors.ChartText[_$TelegramCharts.modeSwitcherData.mode]
-            );
+            context.fillStyle = rgbToString(getColor("ChartText"));
 
             context.fillText(toDateString(dates[i]), x, height);
 
@@ -1096,7 +1095,9 @@ class Chart {
 
     return {
       hook: () => {
-        console.log("Animate y axis");
+        if (VERBOSE) {
+          console.log("Animate y axis");
+        }
 
         if (yAxis.opacity < 1) {
           yAxis.opacity += 0.08;

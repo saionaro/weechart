@@ -474,6 +474,12 @@ class Chart {
     const yScale = this._getVerticalParams(this._chart);
     let dates;
 
+    const data = {
+      date: 0,
+      x,
+      values: {}
+    };
+
     for (let column of this._data.columns) {
       const type = column[0];
 
@@ -482,9 +488,12 @@ class Chart {
         continue;
       }
 
-      if (isLine(this._data.types[type]) && opacity[type]) {
+      if (opacity[type]) {
         const y = height - column[index] * yScale - DATE_MARGIN * 2;
-        this._updateFloatingWindow(type, column[index], dates[index], x);
+
+        data.date = dates[index];
+        data.values[type] = column[index];
+
         context.strokeStyle = rgbToString(this._rgbColors[type], 1);
         context.beginPath();
         context.arc(x, y, 5, 0, 2 * Math.PI, false);
@@ -495,17 +504,32 @@ class Chart {
         context.stroke();
       }
     }
+    this._updateFloatingWindow(data);
   }
 
-  _updateFloatingWindow(type, value, date, x) {
+  _updateFloatingWindow({ x, date, values }) {
     const {
       floatingWindow: { elem, dateElem }
     } = this._state;
     elem.className = "floating-window";
     dateElem.innerHTML = `${toWeekday(date)}, ${toDateString(date)}`;
-    const countElem = elem.querySelector(`.${getLabelClass(type)}`);
-    countElem.innerHTML = value;
+
+    for (const type in values) {
+      elem.querySelector(`.${getLabelClass(type)}`).innerHTML = values[type];
+    }
+
     elem.style = `transform: translateX(${x + 15}px)`;
+  }
+
+  _hideFloatingWindowLabel(type, hide) {
+    const {
+      floatingWindow: { elem }
+    } = this._state;
+    const countElem = elem.querySelector(`.${getLabelClass(type)}`);
+    const className = hide
+      ? "floating-window__section floating-window__section--hidden"
+      : "floating-window__section";
+    countElem.parentNode.className = className;
   }
 
   _floatMouseLeave() {
@@ -879,6 +903,7 @@ class Chart {
   _onChangeCheckbox({ target }) {
     this._pushAnimation(this._animateHideChart(target.name, target.checked));
     this._state.exclude[target.name] = !target.checked;
+    this._hideFloatingWindowLabel(target.name, !target.checked);
     this._findAllExtremums();
     this._pushAnimation(this._animateVertical(this._findVerticalRatioDelta()));
     this._animationLoop();

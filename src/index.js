@@ -4,7 +4,6 @@
  * * Animate y values and lines
  * * Touch events
  * * Optimize floating window rendering
- * * Hide excluded data from floating window
  * * Refactor code
  */
 

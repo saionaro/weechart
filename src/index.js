@@ -4,6 +4,7 @@
  * * Touch events
  * * Optimize floating window rendering
  * * Refactor code
+ * * Improve yAxis animation
  */
 
 const VERBOSE = false;
@@ -862,6 +863,7 @@ class Chart {
 
     const savedWidth = context.lineWidth;
     const savedFillStyle = context.fillStyle;
+    const savedTextAlign = context.textAlign;
     let datesPainted = false;
     let dates;
 
@@ -896,15 +898,17 @@ class Chart {
           context.lineTo(x, y);
 
           if (isChart && !datesPainted && !(i % everyCount)) {
+            context.textAlign = "center";
             context.lineWidth = 1;
             context.fillStyle = rgbToString(
               colors.ChartText[_$TelegramCharts.modeSwitcherData.mode]
             );
 
-            context.fillText(toDateString(dates[i]), x - 15, height);
+            context.fillText(toDateString(dates[i]), x, height);
 
             context.lineWidth = savedWidth;
             context.fillStyle = savedFillStyle;
+            context.textAlign = savedTextAlign;
           }
 
           if (isChart && x + shift > width) break;

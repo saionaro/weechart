@@ -175,7 +175,8 @@ body {
   display: none;
 }
 
-.floating-window__section + .floating-window__section {
+.floating-window__section:not(.floating-window__section--hidden)
+  + .floating-window__section {
   margin-left: 8px;
 }
 

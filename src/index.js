@@ -2,7 +2,6 @@
  * TODO
  * * Animate dates
  * * Touch events
- * * Optimize floating window rendering
  * * Refactor code
  */
 
@@ -322,6 +321,7 @@ class Chart {
     this._lines = [];
     this._dates = null;
     this._dataCount = data.columns[0].length - 1;
+    this._visibleCount = 0;
 
     this._chart = createCanvasObject(cavasType.Chart, w, h);
     this._chart.height -= DATE_MARGIN;
@@ -364,6 +364,7 @@ class Chart {
         this._rgbColors[type] = hexToRgb(this._data.colors[type]);
         this._transitions.chartsOpacity[type] = 1;
         this._lines.push(column);
+        this._visibleCount++;
       } else {
         this._dates = column;
       }
@@ -377,6 +378,7 @@ class Chart {
       exclude: {},
       floatingWindow: {
         elem: null,
+        labels: {},
         dateElem: null
       },
       drag: {
@@ -394,14 +396,18 @@ class Chart {
 
     const fragment = document.createDocumentFragment();
     const wrapper = document.createElement("div");
+    const floatingWindow = this._state.floatingWindow;
     const dragger = this._state.drag.dragger;
-    this._state.floatingWindow.elem = createFloatingWindow(
-      this._data,
-      this._rgbColors
-    );
-    this._state.floatingWindow.dateElem = this._state.floatingWindow.elem.querySelector(
+    floatingWindow.elem = createFloatingWindow(this._data, this._rgbColors);
+    floatingWindow.dateElem = floatingWindow.elem.querySelector(
       ".floating-window__date"
     );
+    for (let column of this._lines) {
+      const type = column[0];
+      floatingWindow.labels[type] = floatingWindow.elem.querySelector(
+        `.${getLabelClass(type)}`
+      );
+    }
 
     setTransform(dragger.style, viewShift);
     this._transitions.xShift = viewShift / this._minimap.width;
@@ -465,7 +471,8 @@ class Chart {
     const {
       drag: { active }
     } = this._state;
-    if (active) return;
+
+    if (active || !this._visibleCount) return;
     const { scale, shift, window } = this._getXParams(this._chart);
     const cursorX = getCursorXPosition(this._float.canvas, event);
     const selected = Math.ceil(cursorX / scale + window[0]);
@@ -516,13 +523,13 @@ class Chart {
 
   _updateFloatingWindow({ x, date, values }) {
     const {
-      floatingWindow: { elem, dateElem }
+      floatingWindow: { elem, dateElem, labels }
     } = this._state;
     elem.className = "floating-window";
     dateElem.innerHTML = `${toWeekday(date)}, ${toDateString(date)}`;
 
     for (const type in values) {
-      elem.querySelector(`.${getLabelClass(type)}`).innerHTML = values[type];
+      labels[type].innerHTML = values[type];
     }
 
     elem.style = `transform: translateX(${x + 15}px)`;
@@ -530,13 +537,11 @@ class Chart {
 
   _hideFloatingWindowLabel(type, hide) {
     const {
-      floatingWindow: { elem }
+      floatingWindow: { labels }
     } = this._state;
-    const countElem = elem.querySelector(`.${getLabelClass(type)}`);
-    const className = hide
+    labels[type].parentNode.className = hide
       ? "floating-window__section floating-window__section--hidden"
       : "floating-window__section";
-    countElem.parentNode.className = className;
   }
 
   _floatMouseLeave() {
@@ -952,6 +957,7 @@ class Chart {
   _onChangeCheckbox({ target }) {
     this._pushAnimation(this._animateHideChart(target.name, target.checked));
     this._state.exclude[target.name] = !target.checked;
+    this._visibleCount += this._state.exclude[target.name] ? -1 : 1;
     this._hideFloatingWindowLabel(target.name, !target.checked);
     this._findAllExtremums();
     this._pushAnimation(this._animateVertical(this._findYDeltas()));

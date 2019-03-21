@@ -3,6 +3,7 @@
  * * Animate dates
  * * Touch events
  * * Refactor code
+ * * Check x shift
  */
 
 const VERBOSE = false;
@@ -363,10 +364,13 @@ class Chart {
       if (this._data.types[type] === dataTypes.Line) {
         this._rgbColors[type] = hexToRgb(this._data.colors[type]);
         this._transitions.chartsOpacity[type] = 1;
-        this._lines.push(column);
+        this._lines.push({
+          type: column[0],
+          data: column.slice(1)
+        });
         this._visibleCount++;
       } else {
-        this._dates = column;
+        this._dates = column.slice(1);
       }
     }
 
@@ -403,9 +407,8 @@ class Chart {
       ".floating-window__date"
     );
     for (let column of this._lines) {
-      const type = column[0];
-      floatingWindow.labels[type] = floatingWindow.elem.querySelector(
-        `.${getLabelClass(type)}`
+      floatingWindow.labels[column.type] = floatingWindow.elem.querySelector(
+        `.${getLabelClass(column.type)}`
       );
     }
 
@@ -501,15 +504,13 @@ class Chart {
     };
 
     for (let column of this._lines) {
-      const type = column[0];
-
-      if (chartsOpacity[type]) {
-        const y = height - column[index] * yScale - DATE_MARGIN * 2;
+      if (chartsOpacity[column.type]) {
+        const y = height - column.data[index] * yScale - DATE_MARGIN * 2;
 
         data.date = this._dates[index];
-        data.values[type] = column[index];
+        data.values[column.type] = column.data[index];
 
-        context.strokeStyle = rgbToString(this._rgbColors[type], 1);
+        context.strokeStyle = rgbToString(this._rgbColors[column.type], 1);
         context.beginPath();
         context.arc(x, y, 5, 0, 2 * Math.PI, false);
         context.fillStyle = getColor("ChartBackground");
@@ -565,7 +566,7 @@ class Chart {
     let max = -Infinity;
     let min = Infinity;
     let from = 1;
-    let to = _lines[0].length;
+    let to = this._dataCount;
 
     if (range) {
       from = range[0] + 1;
@@ -573,15 +574,13 @@ class Chart {
     }
 
     for (let column of _lines) {
-      const type = column[0];
-
-      if (!_state.exclude[type]) {
+      if (!_state.exclude[column.type]) {
         for (let i = from; i < to; i++) {
-          if (column[i] > max) {
-            max = column[i];
+          if (column.data[i] > max) {
+            max = column.data[i];
           }
-          if (column[i] < min) {
-            min = column[i];
+          if (column.data[i] < min) {
+            min = column.data[i];
           }
         }
       }
@@ -826,20 +825,21 @@ class Chart {
       _transitions: { xShift, [type]: record },
       _dataCount: count
     } = this;
-    const xRatio = calculateHorisontalRatio(count, width);
-    const scale = xRatio * record.xRatioModifer;
+    const scale = calculateHorisontalRatio(count, width) * record.xRatioModifer;
 
     const params = {
       scale,
       shift: -(count * scale * xShift),
-      window: []
+      window: [0, count]
     };
 
-    const start = Math.round(-params.shift / params.scale) - 1;
-    const end = Math.round((width - params.shift) / params.scale);
+    if (type === cavasType.Chart) {
+      const start = Math.round(-params.shift / params.scale) - 1;
+      const end = Math.round((width - params.shift) / params.scale) + 2;
 
-    params.window[0] = start < 0 ? 0 : start;
-    params.window[1] = end > count ? count : end;
+      params.window[0] = start < 0 ? 0 : start;
+      params.window[1] = end > count ? count : end;
+    }
 
     return params;
   }
@@ -855,8 +855,8 @@ class Chart {
     );
   }
 
-  _renderChart(canvasParams, { scale, shift }) {
-    const { context, width, height, type: canvasType } = canvasParams;
+  _renderChart(canvasParams, { scale, shift, window }) {
+    const { context, height, type: canvasType } = canvasParams;
     const {
       _lines: lines,
       _transitions: { chartsOpacity }
@@ -877,25 +877,21 @@ class Chart {
     const everyCount = Math.round(100 / scale);
 
     for (let column of lines) {
-      const type = column[0];
+      const type = column.type;
       const opacityValue = chartsOpacity[type];
 
       if (opacityValue !== 0) {
         context.beginPath();
         context.strokeStyle = rgbToString(this._rgbColors[type], opacityValue);
-        context.moveTo(0, height - column[1] * yScale);
 
-        for (let i = 2; i < column.length; i++) {
-          if (isChart && (i + 1) * scale + shift < 0) {
-            continue;
-          }
-
+        for (let i = window[0]; i < window[1]; i++) {
           const x = i * scale;
-          let y = height - column[i] * yScale;
+          let y = height - column.data[i] * yScale;
 
           if (isChart) {
             y -= DATE_MARGIN;
           }
+
           context.lineTo(x, y);
 
           if (isChart && !datesPainted && !(i % everyCount)) {
@@ -909,8 +905,6 @@ class Chart {
             context.fillStyle = savedFillStyle;
             context.textAlign = savedTextAlign;
           }
-
-          if (isChart && x + shift > width) break;
         }
 
         datesPainted = true;
@@ -925,7 +919,7 @@ class Chart {
     const { _data: data, _container: container, _lines } = this;
 
     for (let column of _lines) {
-      const type = column[0];
+      const type = column.type;
 
       items += `<li class="charts-selector__item">
         <label class="checkbox" style="color: ${rgbToString(

@@ -1,9 +1,10 @@
 /**
  * TODO
- * * Animate dates
- * * Touch events
- * * Refactor code
+ * * (!!!) Animate dates
+ * * (!) Touch events
  * * Check x shift
+ * * Check floating window coords calculation
+ * * Refactor code
  */
 
 const VERBOSE = false;

@@ -11,6 +11,7 @@ const VERBOSE = false;
 const DATA_ENDPOINT = "./chart_data.json";
 const HIDDEN_CLASS = "visually-hidden";
 const DATA_TYPE_LINE = "line";
+const ACTIVE_ARROW_CLASS = "chart__minimap-dragger-arrow--active";
 const LINES_COUNT = 6;
 const SCALE_RATE = 1;
 const MINIMAP_HEIGHT = 75;
@@ -401,6 +402,8 @@ class Chart {
         leftArrow: false,
         dragger: createDragger(dragWidth),
         elem: null,
+        leftElem: null,
+        rightElem: null,
         initialWidth: dragWidth,
         width: dragWidth,
         downX: 0,
@@ -411,7 +414,15 @@ class Chart {
     const fragment = document.createDocumentFragment();
     const wrapper = document.createElement("div");
     const floatingWindow = this._state.floatingWindow;
-    const dragger = this._state.drag.dragger;
+    const drag = this._state.drag;
+    const dragger = drag.dragger;
+    drag.leftElem = dragger.querySelector(
+      ".chart__minimap-dragger-arrow--left"
+    );
+    drag.rightElem = dragger.querySelector(
+      ".chart__minimap-dragger-arrow--right"
+    );
+
     floatingWindow.elem = createFloatingWindow(this._data, this._rgbColors);
     floatingWindow.dateElem = floatingWindow.elem.querySelector(
       ".floating-window__date"
@@ -617,15 +628,20 @@ class Chart {
     const { drag } = this._state;
     const { classList } = event.target;
 
+    let className = "chart__minimap-dragger--dragging";
+
     if (classList.contains("chart__minimap-dragger-arrow")) {
+      className = "chart__minimap-dragger--resizing";
       drag.resize = true;
 
       if (classList.contains("chart__minimap-dragger-arrow--left")) {
         drag.leftArrow = true;
+        drag.leftElem.classList.add(ACTIVE_ARROW_CLASS);
+      } else {
+        drag.rightElem.classList.add(ACTIVE_ARROW_CLASS);
       }
     }
-    this._state.drag.dragger.classList.add("chart__minimap-dragger--dragging");
-    drag.elem = event.target;
+    this._state.drag.dragger.classList.add(className);
     drag.downX = event.pageX;
     drag.active = true;
     this._animationLoop();
@@ -731,14 +747,14 @@ class Chart {
 
   _endDrag() {
     const { drag } = this._state;
-    drag.elem = null;
     drag.active = false;
     drag.leftArrow = false;
     drag.resize = false;
     drag.downX = 0;
-    this._state.drag.dragger.classList.remove(
-      "chart__minimap-dragger--dragging"
-    );
+    drag.dragger.classList.remove("chart__minimap-dragger--resizing");
+    drag.dragger.classList.remove("chart__minimap-dragger--dragging");
+    drag.leftElem.classList.remove(ACTIVE_ARROW_CLASS);
+    drag.rightElem.classList.remove(ACTIVE_ARROW_CLASS);
   }
 
   _clear(canvas) {

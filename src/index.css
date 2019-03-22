@@ -80,6 +80,8 @@ body {
 
 .chart__minimap-dragger {
   display: flex;
+  justify-content: space-around;
+  align-items: center;
   position: absolute;
   top: 0;
   background-color: transparent;
@@ -91,21 +93,41 @@ body {
   cursor: pointer;
 }
 
-.chart__minimap-dragger--dragging,
+.chart__minimap-dragger--resizing,
 .chart__minimap-dragger:hover {
   background-color: rgba(240, 247, 252, 0.6);
 }
 
 .chart__minimap-dragger-arrow {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   height: 100%;
   width: 10px;
   background-color: rgba(219, 234, 244, 0.8);
   transition-property: background-color;
   transition-duration: 0.5s;
+  cursor: pointer;
 }
 
-.chart__minimap-dragger-arrow:hover {
-  background-color: rgba(187, 213, 230, 1);
+.chart__minimap-dragger::before,
+.chart__minimap-dragger-arrow::before {
+  transition-property: transform, opacity;
+  transition-duration: 0.35s;
+  transform: scale(0.3);
+  opacity: 0;
+  content: "";
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  position: absolute;
+  background-color: rgba(219, 234, 244, 0.5);
+}
+
+.chart__minimap-dragger--dragging::before,
+.chart__minimap-dragger-arrow--active.chart__minimap-dragger-arrow::before {
+  transform: scale(1);
+  opacity: 1;
 }
 
 .chart__minimap-dragger-arrow--right {
@@ -218,6 +240,11 @@ body {
 .app--night .chart__minimap-dragger--dragging,
 .app--night .chart__minimap-dragger:hover {
   background-color: rgba(29, 42, 57, 0.8);
+}
+
+.app--night .chart__minimap-dragger::before,
+.app--night .chart__minimap-dragger-arrow::before {
+  background-color: rgba(59, 86, 109, 0.6);
 }
 
 .app--night .floating-window {

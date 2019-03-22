@@ -86,11 +86,14 @@ body {
   border: 2px solid rgba(219, 234, 244, 0.8);
   border-left: none;
   border-right: 0;
-  transition-property: border-color;
+  transition-property: border-color, background-color;
   transition-duration: 0.5s;
+  cursor: pointer;
 }
 
-.chart__minimap-dragger--dragging {
+.chart__minimap-dragger--dragging,
+.chart__minimap-dragger:hover {
+  background-color: rgba(240, 247, 252, 0.6);
 }
 
 .chart__minimap-dragger-arrow {
@@ -99,6 +102,10 @@ body {
   background-color: rgba(219, 234, 244, 0.8);
   transition-property: background-color;
   transition-duration: 0.5s;
+}
+
+.chart__minimap-dragger-arrow:hover {
+  background-color: rgba(187, 213, 230, 1);
 }
 
 .chart__minimap-dragger-arrow--right {
@@ -176,7 +183,7 @@ body {
 }
 
 .floating-window__section:not(.floating-window__section--hidden)
-  + .floating-window__section {
+  ~ .floating-window__section {
   margin-left: 8px;
 }
 
@@ -206,6 +213,11 @@ body {
 
 .app--night .chart__minimap-dragger {
   border-color: rgba(59, 86, 109, 0.8);
+}
+
+.app--night .chart__minimap-dragger--dragging,
+.app--night .chart__minimap-dragger:hover {
+  background-color: rgba(29, 42, 57, 0.8);
 }
 
 .app--night .floating-window {

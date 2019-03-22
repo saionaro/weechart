@@ -1,9 +1,9 @@
 /**
  * TODO
  * * (!) Touch events
- * * Check x shift
  * * Refactor code
  * * Optimize _getXParams
+ * * Add round animation while dragging
  */
 
 const VERBOSE = false;
@@ -14,7 +14,7 @@ const DATA_TYPE_LINE = "line";
 const LINES_COUNT = 6;
 const SCALE_RATE = 1;
 const MINIMAP_HEIGHT = 75;
-const INITIAL_X_SCALE = 5;
+const INITIAL_X_SCALE = 5.25;
 const ANIMATION_STEPS = 16;
 const DATES_PLACE = 65;
 const Y_AXIS_ANIMATION_SHIFT = 180;
@@ -185,8 +185,6 @@ const calculateVerticalRatio = (maxValue, height) => {
   }
 };
 
-const calculateHorisontalRatio = (count, width) => width / count;
-
 const getCursorXPosition = (canvas, event) =>
   event.clientX - canvas.getBoundingClientRect().left;
 
@@ -318,6 +316,11 @@ const createFloatingWindow = (data, colors) => {
 
 const getColor = color => colors[color][_$TelegramCharts.modeSwitcherData.mode];
 
+const createExtremumStore = () => ({
+  prev: { min: 0, max: 0 },
+  current: { min: 0, max: 0 }
+});
+
 class Chart {
   constructor(container, data, { w, h }) {
     this._data = data;
@@ -437,7 +440,7 @@ class Chart {
     this._moveDrag = this._moveDrag.bind(this);
     this._endDrag = this._endDrag.bind(this);
     this._floatMouseMove = throttle(this._floatMouseMove.bind(this), 60);
-    this._checkYScaleChange = throttle(this._checkYScaleChange.bind(this), 200);
+    this._checkYScaleChange = throttle(this._checkYScaleChange.bind(this), 160);
     this._floatMouseLeave = this._floatMouseLeave.bind(this);
 
     dragger.addEventListener("mousedown", this._startDrag, listenerOpts);
@@ -462,15 +465,8 @@ class Chart {
       listenerOpts
     );
 
-    this._localExtremums = {
-      prev: { min: 0, max: 0 },
-      current: { min: 0, max: 0 }
-    };
-
-    this._globalExtremums = {
-      prev: { min: 0, max: 0 },
-      current: { min: 0, max: 0 }
-    };
+    this._localExtremums = createExtremumStore();
+    this._globalExtremums = createExtremumStore();
 
     const hiddenDates = this._getHiddenDates(
       this._dataCount,
@@ -627,12 +623,8 @@ class Chart {
       if (classList.contains("chart__minimap-dragger-arrow--left")) {
         drag.leftArrow = true;
       }
-    } else {
-      this._state.drag.dragger.classList.add(
-        "chart__minimap-dragger--dragging"
-      );
     }
-
+    this._state.drag.dragger.classList.add("chart__minimap-dragger--dragging");
     drag.elem = event.target;
     drag.downX = event.pageX;
     drag.active = true;
@@ -727,17 +719,13 @@ class Chart {
   }
 
   _checkYScaleChange() {
-    const extremums = this._localExtremums;
+    const extrPrev = this._localExtremums.prev;
+    const extrCurr = this._localExtremums.current;
     this._findAllExtremums();
 
-    if (
-      extremums.prev.max !== extremums.current.max ||
-      extremums.prev.min !== extremums.current.min
-    ) {
+    if (extrPrev.max !== extrCurr.max || extrPrev.min !== extrCurr.min) {
       this._pushAnimation(this._animateVertical(this._findYDeltas()));
-      this._pushAnimation(
-        this._animateYAxis(extremums.prev.max < extremums.current.max)
-      );
+      this._pushAnimation(this._animateYAxis(extrPrev.max < extrCurr.max));
     }
   }
 
@@ -868,11 +856,12 @@ class Chart {
       _transitions: { xShift, [type]: record },
       _dataCount: count
     } = this;
-    const scale = calculateHorisontalRatio(count, width) * record.xRatioModifer;
+    const countM1 = count - 1;
+    const scale = (width / countM1) * record.xRatioModifer;
 
     const params = {
       scale,
-      shift: -(count * scale * xShift),
+      shift: -(countM1 * scale * xShift),
       window: [0, count]
     };
 
@@ -962,12 +951,13 @@ class Chart {
           context.lineTo(x, y);
 
           if (isChart && !datesPainted) {
+            const isLast = i === window[1] - 1;
             const hide = hiddenDates.current[i] && !hiddenDates.prev[i];
             const show = !hiddenDates.current[i] && hiddenDates.prev[i];
-            let opacity = 1;
             const isTransition = show || hide;
+            let opacity = 1;
 
-            context.textAlign = "center";
+            context.textAlign = isLast ? "right" : "center";
             context.lineWidth = 1;
 
             if (isTransition) {
@@ -1245,7 +1235,9 @@ const onFetchData = data => {
   for (let i = 0; i < data.length; i++) {
     const chartContainer = document.createElement("div");
     chartContainer.className = "chart";
-    new Chart(chartContainer, data[i], { w: CHART_WIDTH, h: CHART_HEIGHT });
+    requestAnimationFrame(() => {
+      new Chart(chartContainer, data[i], { w: CHART_WIDTH, h: CHART_HEIGHT });
+    });
     fragment.appendChild(chartContainer);
   }
 
@@ -1259,9 +1251,9 @@ const fetchData = () =>
     .catch(console.log);
 
 const switchMode = () => {
-  const { modeSwitcherData: data } = _$TelegramCharts;
-  const isNight = data.mode === data.modes.Night;
-  const newMode = isNight ? data.modes.Day : data.modes.Night;
+  const { modeSwitcherData: data, modes } = _$TelegramCharts;
+  const isNight = data.mode === modes.Night;
+  const newMode = isNight ? modes.Day : modes.Night;
 
   data.mode = newMode;
   data.element.innerHTML = data.captions[newMode];

@@ -9,6 +9,8 @@
 const VERBOSE = false;
 
 const DATA_ENDPOINT = "./chart_data.json";
+const HIDDEN_CLASS = "visually-hidden";
+const DATA_TYPE_LINE = "line";
 const LINES_COUNT = 6;
 const SCALE_RATE = 1;
 const MINIMAP_HEIGHT = 75;
@@ -17,10 +19,12 @@ const ANIMATION_STEPS = 16;
 const DATES_PLACE = 65;
 const Y_AXIS_ANIMATION_SHIFT = 180;
 const DATE_MARGIN = 16;
+const CHART_WIDTH = 800;
+const CHART_HEIGHT = 400;
 const HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
 const PIXEL_RATIO = (() => {
   const ctx = document.createElement("canvas").getContext("2d");
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = devicePixelRatio || 1;
   const bsr =
     ctx.webkitBackingStorePixelRatio ||
     ctx.mozBackingStorePixelRatio ||
@@ -31,43 +35,43 @@ const PIXEL_RATIO = (() => {
   return dpr / bsr;
 })();
 
-const monthNames = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec"
-];
-
-const weekdaysNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const shortcuts = {
+  months: [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec"
+  ],
+  weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+};
 
 let appElement;
-
-const modes = {
-  Night: "night",
-  Day: "day"
-};
 
 const listenerOpts = {
   passive: true
 };
 
 const _$TelegramCharts = {
+  modes: {
+    Night: "night",
+    Day: "day"
+  },
   modeSwitcherData: {
     element: null,
     updateHooks: [],
     captions: {
-      [modes.Night]: "Switch to Day Mode",
-      [modes.Day]: "Switch to Night Mode"
+      night: "Switch to Day Mode",
+      day: "Switch to Night Mode"
     },
-    mode: modes.Day
+    mode: "day"
   },
   listenersActivated: false,
   mousemoveConsumers: [],
@@ -85,12 +89,12 @@ const _$TelegramCharts = {
     }
   },
   activateDragEvents: () => {
-    window.document.addEventListener(
+    document.addEventListener(
       "mousemove",
       _$TelegramCharts.onMouseMove,
       listenerOpts
     );
-    window.document.addEventListener(
+    document.addEventListener(
       "mouseup",
       _$TelegramCharts.onMouseUp,
       listenerOpts
@@ -99,18 +103,13 @@ const _$TelegramCharts = {
   }
 };
 
-const dataTypes = {
-  Line: "line",
-  Date: "x"
-};
-
-const cavasType = {
+const canvasTypesEnum = {
   Minimap: "minimap",
   Chart: "chart",
   Float: "float"
 };
 
-const chartTypesList = [cavasType.Minimap, cavasType.Chart];
+const chartTypesList = [canvasTypesEnum.Minimap, canvasTypesEnum.Chart];
 
 const colors = {
   ChartSeparator: {
@@ -246,7 +245,9 @@ const cachedDates = {};
 const toDateString = timestamp => {
   if (!cachedDates[timestamp]) {
     const date = new Date(timestamp);
-    cachedDates[timestamp] = `${monthNames[date.getMonth()]} ${date.getDate()}`;
+    cachedDates[timestamp] = `${
+      shortcuts.months[date.getMonth()]
+    } ${date.getDate()}`;
   }
   return cachedDates[timestamp];
 };
@@ -256,7 +257,7 @@ const cachedWeekdays = {};
 const toWeekday = timestamp => {
   if (!cachedWeekdays[timestamp]) {
     const date = new Date(timestamp);
-    cachedWeekdays[timestamp] = `${weekdaysNames[date.getDay()]}`;
+    cachedWeekdays[timestamp] = `${shortcuts.weekdays[date.getDay()]}`;
   }
   return cachedWeekdays[timestamp];
 };
@@ -305,7 +306,7 @@ const createFloatingWindow = (data, colors) => {
   }
 
   const floatingWindow = document.createElement("div");
-  floatingWindow.className = "floating-window visually-hidden";
+  floatingWindow.className = `floating-window ${HIDDEN_CLASS}`;
   floatingWindow.innerHTML = `
     <p class="floating-window__date"></p>
       <ul class="floating-window__sections">
@@ -325,16 +326,20 @@ class Chart {
     this._dataCount = data.columns[0].length - 1;
     this._visibleCount = 0;
 
-    this._chart = createCanvasObject(cavasType.Chart, w, h);
+    this._chart = createCanvasObject(canvasTypesEnum.Chart, w, h);
     this._chart.height -= DATE_MARGIN;
     this._chart.canvas.className = "chart__chart-canvas";
     this._chart.context = this._chart.canvas.getContext("2d");
 
-    this._float = createCanvasObject(cavasType.Float, w, h);
+    this._float = createCanvasObject(canvasTypesEnum.Float, w, h);
     this._float.canvas.className = "chart__float-canvas";
     this._float.context = this._float.canvas.getContext("2d");
 
-    this._minimap = createCanvasObject(cavasType.Minimap, w, MINIMAP_HEIGHT);
+    this._minimap = createCanvasObject(
+      canvasTypesEnum.Minimap,
+      w,
+      MINIMAP_HEIGHT
+    );
     this._minimap.canvas.className = "chart__minimap-canvas";
     this._minimap.context = this._minimap.canvas.getContext("2d");
 
@@ -342,11 +347,11 @@ class Chart {
     this._animations = [];
 
     this._transitions = {
-      [cavasType.Minimap]: {
+      [canvasTypesEnum.Minimap]: {
         yRatioModifer: 0,
         xRatioModifer: 1
       },
-      [cavasType.Chart]: {
+      [canvasTypesEnum.Chart]: {
         yRatioModifer: 0,
         xRatioModifer: INITIAL_X_SCALE
       },
@@ -363,7 +368,7 @@ class Chart {
     for (let column of data.columns) {
       const type = column[0];
 
-      if (this._data.types[type] === dataTypes.Line) {
+      if (this._data.types[type] === DATA_TYPE_LINE) {
         this._rgbColors[type] = hexToRgb(this._data.colors[type]);
         this._transitions.chartsOpacity[type] = 1;
         this._lines.push({
@@ -432,7 +437,7 @@ class Chart {
     this._moveDrag = this._moveDrag.bind(this);
     this._endDrag = this._endDrag.bind(this);
     this._floatMouseMove = throttle(this._floatMouseMove.bind(this), 60);
-    this._checkYScaleChange = throttle(this._checkYScaleChange.bind(this), 100);
+    this._checkYScaleChange = throttle(this._checkYScaleChange.bind(this), 200);
     this._floatMouseLeave = this._floatMouseLeave.bind(this);
 
     dragger.addEventListener("mousedown", this._startDrag, listenerOpts);
@@ -540,30 +545,30 @@ class Chart {
     const {
       floatingWindow: { elem, dateElem, labels }
     } = this._state;
-    elem.className = "floating-window";
+    elem.classList.remove(HIDDEN_CLASS);
     dateElem.innerHTML = `${toWeekday(date)}, ${toDateString(date)}`;
 
     for (const type in values) {
       labels[type].innerHTML = values[type];
     }
-
-    elem.style = `transform: translateX(${x + 15}px)`;
+    setTransform(elem.style, x + 15);
   }
 
   _hideFloatingWindowLabel(type, hide) {
     const {
       floatingWindow: { labels }
     } = this._state;
-    labels[type].parentNode.className = hide
-      ? "floating-window__section floating-window__section--hidden"
-      : "floating-window__section";
+
+    labels[type].parentNode.classList.toggle(
+      "floating-window__section--hidden",
+      hide
+    );
   }
 
   _floatMouseLeave() {
     setTimeout(() => {
       this._clear(this._float.canvas);
-      this._state.floatingWindow.elem.className =
-        "floating-window visually-hidden";
+      this._state.floatingWindow.elem.classList.add(HIDDEN_CLASS);
     }, 100);
   }
 
@@ -623,7 +628,9 @@ class Chart {
         drag.leftArrow = true;
       }
     } else {
-      this._state.drag.dragger.classList += " chart__minimap-dragger--dragging";
+      this._state.drag.dragger.classList.add(
+        "chart__minimap-dragger--dragging"
+      );
     }
 
     drag.elem = event.target;
@@ -683,7 +690,7 @@ class Chart {
   }
 
   _changeDragWidth(delta) {
-    const { [cavasType.Chart]: record } = this._transitions;
+    const { [canvasTypesEnum.Chart]: record } = this._transitions;
     const { drag } = this._state;
     const changedWidth = drag.width + delta;
     const deltaRatio = drag.width / changedWidth;
@@ -741,7 +748,9 @@ class Chart {
     drag.leftArrow = false;
     drag.resize = false;
     drag.downX = 0;
-    this._state.drag.dragger.classList = "chart__minimap-dragger";
+    this._state.drag.dragger.classList.remove(
+      "chart__minimap-dragger--dragging"
+    );
   }
 
   _clear(canvas) {
@@ -867,7 +876,7 @@ class Chart {
       window: [0, count]
     };
 
-    if (type === cavasType.Chart) {
+    if (type === canvasTypesEnum.Chart) {
       const start = Math.round(-params.shift / params.scale) - 1;
       const end = Math.round((width - params.shift) / params.scale) + 2;
 
@@ -881,7 +890,9 @@ class Chart {
   _getYParams({ height, type }) {
     const { _transitions } = this;
     const usedExtremums =
-      type === cavasType.Chart ? this._localExtremums : this._globalExtremums;
+      type === canvasTypesEnum.Chart
+        ? this._localExtremums
+        : this._globalExtremums;
 
     return (
       calculateVerticalRatio(usedExtremums.current.max, height) +
@@ -919,7 +930,7 @@ class Chart {
       _lines: lines,
       _transitions: { chartsOpacity, datesOpacity }
     } = this;
-    const isChart = canvasType === cavasType.Chart;
+    const isChart = canvasType === canvasTypesEnum.Chart;
     const yScale = this._getYParams(canvasParams);
 
     if (shift && isChart) {
@@ -994,7 +1005,7 @@ class Chart {
         )}">
           <input
             type="checkbox"
-            class="checkbox__input visually-hidden"
+            class="checkbox__input ${HIDDEN_CLASS}"
             name="${type}"
             checked
           >
@@ -1044,7 +1055,7 @@ class Chart {
 
     for (const canvasType of chartTypesList) {
       const { height } = this[`_${canvasType}`];
-      const isChart = canvasType === cavasType.Chart;
+      const isChart = canvasType === canvasTypesEnum.Chart;
       const extrOld = isChart ? local.prev : glob.prev;
       const extrNew = isChart ? local.current : glob.current;
 
@@ -1099,7 +1110,7 @@ class Chart {
   _animateHorisontal(oldVal, newVal) {
     const tag = "_animateHorisontal";
     const step = (newVal - oldVal) / ANIMATION_STEPS;
-    const { [cavasType.Chart]: record } = this._transitions;
+    const { [canvasTypesEnum.Chart]: record } = this._transitions;
     record.xRatioModifer = newVal;
 
     return {
@@ -1221,7 +1232,7 @@ class Chart {
         this._animations[key]();
       }
       this._render();
-      window.requestAnimationFrame(this._animationLoop);
+      requestAnimationFrame(this._animationLoop);
     } else {
       this._render();
     }
@@ -1231,13 +1242,10 @@ class Chart {
 const onFetchData = data => {
   const fragment = document.createDocumentFragment();
 
-  const w = 800;
-  const h = 400;
-
   for (let i = 0; i < data.length; i++) {
     const chartContainer = document.createElement("div");
     chartContainer.className = "chart";
-    new Chart(chartContainer, data[i], { w, h });
+    new Chart(chartContainer, data[i], { w: CHART_WIDTH, h: CHART_HEIGHT });
     fragment.appendChild(chartContainer);
   }
 
@@ -1252,8 +1260,8 @@ const fetchData = () =>
 
 const switchMode = () => {
   const { modeSwitcherData: data } = _$TelegramCharts;
-  const isNight = data.mode === modes.Night;
-  const newMode = isNight ? modes.Day : modes.Night;
+  const isNight = data.mode === data.modes.Night;
+  const newMode = isNight ? data.modes.Day : data.modes.Night;
 
   data.mode = newMode;
   data.element.innerHTML = data.captions[newMode];

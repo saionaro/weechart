@@ -1,10 +1,10 @@
 /**
  * TODO
- * * (!!!) Animate dates
  * * (!) Touch events
  * * Check x shift
  * * Check floating window coords calculation
  * * Refactor code
+ * * Optimize _getXParams
  */
 
 const VERBOSE = false;
@@ -15,6 +15,7 @@ const SCALE_RATE = 1;
 const MINIMAP_HEIGHT = 75;
 const INITIAL_X_SCALE = 5;
 const ANIMATION_STEPS = 16;
+const DATES_PLACE = 65;
 const Y_AXIS_ANIMATION_SHIFT = 180;
 const DATE_MARGIN = 16;
 const HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
@@ -351,6 +352,7 @@ class Chart {
         xRatioModifer: INITIAL_X_SCALE
       },
       chartsOpacity: {},
+      datesOpacity: 1,
       yAxis: {
         opacity: 1,
         toDown: false,
@@ -464,6 +466,17 @@ class Chart {
     this._globalExtremums = {
       prev: { min: 0, max: 0 },
       current: { min: 0, max: 0 }
+    };
+
+    const hiddenDates = this._getHiddenDates(
+      this._dataCount,
+      this._getXParams(this._chart).window,
+      w
+    );
+
+    this._hiddenDates = {
+      prev: hiddenDates,
+      current: hiddenDates
     };
 
     this._findAllExtremums();
@@ -684,6 +697,26 @@ class Chart {
       )
     );
     this._checkYScaleChange();
+    this._checkHiddenDatesChange();
+  }
+
+  _checkHiddenDatesChange() {
+    const { _hiddenDates: dates } = this;
+
+    const hiddenDates = this._getHiddenDates(
+      this._dataCount,
+      this._getXParams(this._chart).window,
+      this._chart.width
+    );
+
+    if (hiddenDates._$count !== dates.current._$count) {
+      dates.prev = dates.current;
+      dates.current = hiddenDates;
+
+      this._pushAnimation(
+        this._animateDates(dates.prev._$count < dates.current._$count)
+      );
+    }
   }
 
   _checkYScaleChange() {
@@ -856,11 +889,35 @@ class Chart {
     );
   }
 
+  _getHiddenDates(total, window, width) {
+    const toHide = {};
+    let count = window[1] - window[0];
+    let iter = 1;
+
+    while (count * DATES_PLACE > width) {
+      for (let i = total - 1 - iter; i >= 0; i -= 2 * iter) {
+        toHide[i] = true;
+      }
+
+      let localCount = 0;
+      for (let i = window[0]; i < window[1]; i++) {
+        localCount += toHide[i] ? 0 : 1;
+      }
+      count = localCount;
+      iter++;
+    }
+
+    toHide._$count = Object.keys(toHide).length;
+
+    return toHide;
+  }
+
   _renderChart(canvasParams, { scale, shift, window }) {
     const { context, height, type: canvasType } = canvasParams;
     const {
+      _hiddenDates: hiddenDates,
       _lines: lines,
-      _transitions: { chartsOpacity }
+      _transitions: { chartsOpacity, datesOpacity }
     } = this;
     const isChart = canvasType === cavasType.Chart;
     const yScale = this._getYParams(canvasParams);
@@ -874,8 +931,6 @@ class Chart {
     const savedTextAlign = context.textAlign;
 
     let datesPainted = false;
-
-    const everyCount = Math.round(100 / scale);
 
     for (let column of lines) {
       const type = column.type;
@@ -895,12 +950,23 @@ class Chart {
 
           context.lineTo(x, y);
 
-          if (isChart && !datesPainted && !(i % everyCount)) {
+          if (isChart && !datesPainted) {
+            const hide = hiddenDates.current[i] && !hiddenDates.prev[i];
+            const show = !hiddenDates.current[i] && hiddenDates.prev[i];
+            let opacity = 1;
+            const isTransition = show || hide;
+
             context.textAlign = "center";
             context.lineWidth = 1;
-            context.fillStyle = rgbToString(getColor("ChartText"));
 
-            context.fillText(toDateString(this._dates[i]), x, height);
+            if (isTransition) {
+              opacity = datesOpacity;
+            }
+
+            if (opacity && (isTransition || !hiddenDates.current[i])) {
+              context.fillStyle = rgbToString(getColor("ChartText"), opacity);
+              context.fillText(toDateString(this._dates[i]), x, height);
+            }
 
             context.lineWidth = savedWidth;
             context.fillStyle = savedFillStyle;
@@ -950,6 +1016,7 @@ class Chart {
   }
 
   _onChangeCheckbox({ target }) {
+    const extremums = this._localExtremums;
     this._pushAnimation(this._animateHideChart(target.name, target.checked));
     this._state.exclude[target.name] = !target.checked;
     this._visibleCount += this._state.exclude[target.name] ? -1 : 1;
@@ -957,11 +1024,9 @@ class Chart {
     this._findAllExtremums();
     this._pushAnimation(this._animateVertical(this._findYDeltas()));
 
-    if (this._localExtremums.prev.max !== this._localExtremums.current.max) {
+    if (extremums.prev.max !== extremums.current.max) {
       this._pushAnimation(
-        this._animateYAxis(
-          this._localExtremums.prev.max < this._localExtremums.current.max
-        )
+        this._animateYAxis(extremums.prev.max < extremums.current.max)
       );
     }
 
@@ -1071,6 +1136,31 @@ class Chart {
         if ((record[type] <= 0 && !value) || (record[type] >= 1 && value)) {
           delete this._animations[tag];
           record[type] = value ? 1 : 0;
+        }
+      },
+      tag
+    };
+  }
+
+  _animateDates(hide) {
+    const tag = "_animateHideChart";
+    const record = this._transitions;
+    record.datesOpacity = hide ? 1 : 0;
+
+    return {
+      hook: () => {
+        if (VERBOSE) {
+          console.log("Dates opacity");
+        }
+
+        record.datesOpacity += hide ? -0.06 : 0.06;
+
+        if (
+          (record.datesOpacity <= 0 && hide) ||
+          (record.datesOpacity >= 1 && !hide)
+        ) {
+          delete this._animations[tag];
+          record.datesOpacity = hide ? 0 : 1;
         }
       },
       tag

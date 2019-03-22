@@ -127,7 +127,7 @@ const colors = {
     night: "#222f3f"
   },
   ChartText: {
-    day: { r: 148, g: 162, b: 171 },
+    day: { r: 175, g: 181, b: 187 },
     night: { r: 80, g: 103, b: 121 }
   },
   MinimapBackground: {
@@ -204,7 +204,7 @@ const createHiDPICanvas = (w, h) => {
   canvas.style.height = `${h}px`;
   const context = canvas.getContext("2d");
   context.setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
-  context.font = "11px Helvetica, Arial";
+  context.font = "lighter 13px Helvetica, Arial";
   return canvas;
 };
 
@@ -529,7 +529,7 @@ class Chart {
         context.arc(x, y, 5, 0, 2 * Math.PI, false);
         context.fillStyle = getColor("ChartBackground");
         context.fill();
-        context.lineWidth = 2;
+        context.lineWidth = 2.5;
         context.stroke();
       }
     }
@@ -758,7 +758,7 @@ class Chart {
   _drawChart() {
     this._chart.context.lineWidth = 1;
     this._renderLines(this._chart);
-    this._chart.context.lineWidth = 2;
+    this._chart.context.lineWidth = 2.5;
     const xParams = this._getXParams(this._chart);
     this._renderChart(this._chart, xParams);
     this._renderYValues(this._chart, xParams);

@@ -2,7 +2,6 @@
  * TODO
  * * (!) Touch events
  * * Check x shift
- * * Check floating window coords calculation
  * * Refactor code
  * * Optimize _getXParams
  */
@@ -490,9 +489,10 @@ class Chart {
     } = this._state;
 
     if (active || !this._visibleCount) return;
-    const { scale, shift, window } = this._getXParams(this._chart);
+
+    const { scale, shift } = this._getXParams(this._chart);
     const cursorX = getCursorXPosition(this._float.canvas, event);
-    const selected = Math.ceil(cursorX / scale + window[0]);
+    const selected = Math.round((cursorX - shift) / scale);
     this._drawFloatingLine(selected, selected * scale + shift);
   }
 
@@ -527,9 +527,9 @@ class Chart {
         context.strokeStyle = rgbToString(this._rgbColors[column.type], 1);
         context.beginPath();
         context.arc(x, y, 5, 0, 2 * Math.PI, false);
+        context.lineWidth = 2.5;
         context.fillStyle = getColor("ChartBackground");
         context.fill();
-        context.lineWidth = 2.5;
         context.stroke();
       }
     }

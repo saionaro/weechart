@@ -3,7 +3,7 @@
  * * (!) Touch events
  * * Refactor code
  * * Optimize _getXParams
- * * Add round animation while dragging
+ * * Add waves to checkbox
  */
 
 const VERBOSE = false;
@@ -14,8 +14,8 @@ const DATA_TYPE_LINE = "line";
 const ACTIVE_ARROW_CLASS = "chart__minimap-dragger-arrow--active";
 const LINES_COUNT = 6;
 const SCALE_RATE = 1;
-const MINIMAP_HEIGHT = 75;
-const INITIAL_X_SCALE = 5.25;
+const MINIMAP_HEIGHT = 60;
+const INITIAL_X_SCALE = 5.35;
 const ANIMATION_STEPS = 16;
 const DATES_PLACE = 65;
 const Y_AXIS_ANIMATION_SHIFT = 180;
@@ -144,18 +144,25 @@ const CheckedIcon = `<svg
   <circle
     cx="20"
     cy="20"
-    r="17"
+    r="18"
     stroke="currentColor"
-    stroke-width="3"
+    stroke-width="2"
     fill="currentColor"
   />
   <polyline
+    class="checked-icon__done"
     points="13,22 18,27 27,17"
-    stroke-width="4"
+    stroke-width="3"
     stroke-linejoin="round"
     stroke-linecap="round"
     stroke="white"
     fill="none"
+  />
+  <circle
+    class="checked-icon__anime-circle"
+    cx="20"
+    cy="20"
+    stroke="currentColor"
   />
 </svg>`;
 
@@ -200,6 +207,7 @@ const createHiDPICanvas = (w, h) => {
   canvas.style.width = `${w}px`;
   canvas.style.height = `${h}px`;
   const context = canvas.getContext("2d");
+  context.lineJoin = "round";
   context.setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
   context.font = "lighter 13px Helvetica, Arial";
   return canvas;
@@ -982,7 +990,7 @@ class Chart {
 
             if (opacity && (isTransition || !hiddenDates.current[i])) {
               context.fillStyle = rgbToString(getColor("ChartText"), opacity);
-              context.fillText(toDateString(this._dates[i]), x, height);
+              context.fillText(toDateString(this._dates[i]), x, height + 5);
             }
 
             context.lineWidth = savedWidth;

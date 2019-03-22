@@ -17,11 +17,6 @@ body {
 }
 
 .hide-selection {
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  -khtml-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
   user-select: none;
   outline: none;
   -webkit-tap-highlight-color: transparent;
@@ -117,8 +112,8 @@ body {
   transform: scale(0.3);
   opacity: 0;
   content: "";
-  width: 100px;
-  height: 100px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   position: absolute;
   background-color: rgba(219, 234, 244, 0.5);
@@ -138,24 +133,47 @@ body {
   display: flex;
   align-items: center;
   border: 1px solid #e5ecf1;
-  padding: 4px 8px 4px 4px;
-  border-radius: 14px;
+  padding: 0 16px 0 7px;
+  border-radius: 20px;
   cursor: pointer;
   color: #42484b;
   transition-property: border-color;
   transition-duration: 0.5s;
   font-size: 14px;
+  height: 38px;
 }
 
 .checkbox__title {
   color: #42484b;
-  margin-left: 8px;
+  margin-left: 10px;
   transition-property: color;
   transition-duration: 0.5s;
 }
 
-.checkbox__input:not(:checked) + .checked-icon circle {
+.checked-icon {
+  height: 24px;
+  width: 24px;
+}
+
+.checked-icon__anime-circle {
   fill: white;
+  r: 0px;
+  transition-property: r;
+  transition-duration: 0.4s;
+}
+
+.checked-icon__done {
+  transition-property: transform;
+  transition-duration: 0.4s;
+  transform: scale(1);
+}
+
+.checkbox__input:not(:checked) + .checked-icon .checked-icon__anime-circle {
+  r: 17px;
+}
+
+.checkbox__input:not(:checked) + .checked-icon__done {
+  transform: scale(0);
 }
 
 .charts-selector {
@@ -223,6 +241,10 @@ body {
 
 .app--night .checkbox {
   border-color: #304659;
+}
+
+.app--night .checked-icon__anime-circle {
+  fill: #222f3f;
 }
 
 .app--night .checkbox__title {

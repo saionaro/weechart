@@ -8,7 +8,6 @@ const MINIMAP_HEIGHT = 50;
 const MINIMAL_DRAG_WIDTH = 40;
 const ANIMATION_STEPS = 16;
 const DATES_PLACE = 65;
-const Y_AXIS_ANIMATION_SHIFT = 180;
 const DATE_MARGIN = 32;
 const HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
 const PIXEL_RATIO = (() => {
@@ -365,9 +364,9 @@ class Chart {
     }
     this._visibleCount = 0;
     this._minimapCleaned = false;
-
     this._chart = createCanvasObject(canvasTypesEnum.Chart, w, h);
     this._chart.height -= DATE_MARGIN;
+    this._yAxisAnimationShift = (this._chart.height / LINES_COUNT) * 3;
     this._chart.canvas.className = "chart__chart-canvas hide-selection";
     this._chart.context = this._chart.canvas.getContext("2d");
 
@@ -937,6 +936,7 @@ class Chart {
 
   _renderLines({ context, width, height }) {
     const {
+      _yAxisAnimationShift,
       _localExtremums: { current },
       _transitions: { yAxis }
     } = this;
@@ -958,13 +958,11 @@ class Chart {
 
         if (yAxis.opacity < 1) {
           context.strokeStyle = rgbToString(color, 1 - yAxis.opacity);
-          const y =
-            shift -
-            (Y_AXIS_ANIMATION_SHIFT * (yAxis.toDown ? -1 : 1) - yAxis.shift);
+          const yCoord = y + _yAxisAnimationShift * (yAxis.toDown ? 1 : -1);
 
-          if (y < height) {
-            context.moveTo(0, y);
-            context.lineTo(width, y);
+          if (yCoord < height) {
+            context.moveTo(0, yCoord);
+            context.lineTo(width, yCoord);
           }
         }
       }
@@ -979,6 +977,7 @@ class Chart {
 
   _renderYValues({ context, height }, { shift }) {
     const {
+      _yAxisAnimationShift,
       _localExtremums: { current, prev },
       _transitions: { yAxis }
     } = this;
@@ -1004,9 +1003,7 @@ class Chart {
         }
 
         if (yAxis.opacity < 1) {
-          const yCoord =
-            y -
-            (Y_AXIS_ANIMATION_SHIFT * (yAxis.toDown ? -1 : 1) - yAxis.shift);
+          const yCoord = y + _yAxisAnimationShift * (yAxis.toDown ? 1 : -1);
 
           if (yCoord < maxHeight) {
             context.fillStyle = rgbToString(color, 1 - yAxis.opacity);
@@ -1337,30 +1334,34 @@ class Chart {
     const tag = "_animateYAxis";
 
     const {
+      _yAxisAnimationShift,
       _transitions: { yAxis }
     } = this;
 
     yAxis.toDown = toDown;
     yAxis.opacity = 0;
-    yAxis.shift = Y_AXIS_ANIMATION_SHIFT * (toDown ? -1 : 1);
+    yAxis.shift = _yAxisAnimationShift * (toDown ? -1 : 1);
 
     return {
       hook: () => {
         if (yAxis.opacity < 1) {
-          yAxis.opacity += 0.08;
+          yAxis.opacity += 0.05;
         }
 
         if (toDown) {
           if (yAxis.shift < 0) {
             yAxis.shift += (20 / ANIMATION_STEPS) * 8;
-          } else return;
+          }
         } else {
           if (yAxis.shift > 0) {
             yAxis.shift -= (20 / ANIMATION_STEPS) * 8;
-          } else return;
+          }
         }
 
-        if (yAxis.opacity >= 1) {
+        if (
+          yAxis.opacity >= 1 &&
+          ((toDown && yAxis.shift >= 0) || (!toDown && yAxis.shift <= 0))
+        ) {
           yAxis.opacity = 1;
           yAxis.shift = 0;
           delete this._animations[tag];

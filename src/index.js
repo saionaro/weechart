@@ -9,7 +9,7 @@ const MINIMAL_DRAG_WIDTH = 40;
 const ANIMATION_STEPS = 16;
 const DATES_PLACE = 65;
 const Y_AXIS_ANIMATION_SHIFT = 180;
-const DATE_MARGIN = 16;
+const DATE_MARGIN = 32;
 const HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
 const PIXEL_RATIO = (() => {
   const ctx = document.createElement("canvas").getContext("2d");
@@ -355,7 +355,14 @@ class Chart {
     this._data = data;
     this._lines = [];
     this._dates = null;
-    this._dataCount = data.columns[0].length - 1;
+    const dotsCount = data.columns[0].length - 1;
+    if (dotsCount > 400) {
+      this._overflow = true;
+      this._dataCount = 400;
+    } else {
+      this._overflow = false;
+      this._dataCount = dotsCount;
+    }
     this._visibleCount = 0;
     this._minimapCleaned = false;
 
@@ -365,6 +372,7 @@ class Chart {
     this._chart.context = this._chart.canvas.getContext("2d");
 
     this._float = createCanvasObject(canvasTypesEnum.Float, w, h);
+    this._float.height -= DATE_MARGIN;
     this._float.canvas.className = "chart__float-canvas hide-selection";
     this._float.context = this._float.canvas.getContext("2d");
 
@@ -429,13 +437,21 @@ class Chart {
       if (this._data.types[type] === DATA_TYPE_LINE) {
         this._rgbColors[type] = hexToRgb(this._data.colors[type]);
         this._transitions.chartsOpacity[type] = 1;
+        let data = column.slice(1);
+        if (this._overflow) {
+          data = data.slice(-this._dataCount);
+        }
         this._lines.push({
           type: column[0],
-          data: column.slice(1)
+          data
         });
         this._visibleCount++;
       } else {
-        this._dates = column.slice(1);
+        let dates = column.slice(1);
+        if (this._overflow) {
+          dates = dates.slice(-this._dataCount);
+        }
+        this._dates = dates;
       }
     }
 
@@ -598,7 +614,7 @@ class Chart {
     context.strokeStyle = getColor("FloatingLine");
 
     context.moveTo(x, 0);
-    context.lineTo(x, height - DATE_MARGIN * 2);
+    context.lineTo(x, height);
     context.stroke();
 
     const yScale = this._getYParams(this._chart);
@@ -612,7 +628,7 @@ class Chart {
 
     for (let column of this._lines) {
       if (chartsOpacity[column.type]) {
-        const y = height - column.data[index] * yScale - DATE_MARGIN * 2;
+        const y = height - column.data[index] * yScale;
 
         data.date = this._dates[index];
         data.values[column.type] = column.data[index];
@@ -926,16 +942,15 @@ class Chart {
     } = this;
     const stepSize = height / LINES_COUNT;
     const color = getColor("ChartSeparator");
-    const maxHeight = height - DATE_MARGIN;
 
     context.beginPath();
 
     if (current.max !== -Infinity) {
       for (let i = 1; i < LINES_COUNT; i++) {
-        const shift = maxHeight - i * stepSize;
+        const shift = height - i * stepSize;
         const y = shift + yAxis.shift;
 
-        if (y <= maxHeight) {
+        if (y <= height) {
           context.strokeStyle = rgbToString(color, yAxis.opacity);
           context.moveTo(0, y);
           context.lineTo(width, y);
@@ -947,15 +962,15 @@ class Chart {
             shift -
             (Y_AXIS_ANIMATION_SHIFT * (yAxis.toDown ? -1 : 1) - yAxis.shift);
 
-          if (y < maxHeight) {
+          if (y < height) {
             context.moveTo(0, y);
             context.lineTo(width, y);
           }
         }
       }
       context.strokeStyle = rgbToString(color, 1);
-      context.moveTo(0, maxHeight);
-      context.lineTo(width, maxHeight);
+      context.moveTo(0, height);
+      context.lineTo(width, height);
     }
 
     context.stroke();
@@ -969,7 +984,7 @@ class Chart {
     } = this;
     const stepSize = height / LINES_COUNT;
     const color = getColor("ChartText");
-    const maxHeight = height - DATE_MARGIN - 6;
+    const maxHeight = height - 6;
 
     context.lineWidth = 1;
 
@@ -1104,10 +1119,6 @@ class Chart {
           const x = i * scale;
           let y = height - column.data[i] * yScale;
 
-          if (isChart) {
-            y -= DATE_MARGIN;
-          }
-
           context.lineTo(x, y);
 
           if (isChart && !datesPainted) {
@@ -1126,7 +1137,7 @@ class Chart {
 
             if (opacity && (isTransition || !hiddenDates.current[i])) {
               context.fillStyle = rgbToString(getColor("ChartText"), opacity);
-              context.fillText(toDateString(this._dates[i]), x, height + 5);
+              context.fillText(toDateString(this._dates[i]), x, height + 18);
             }
 
             context.lineWidth = savedWidth;

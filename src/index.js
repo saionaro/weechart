@@ -2,9 +2,6 @@
  * TODO
  * * Dont forget the Autoprefixer
  */
-
-const VERBOSE = false;
-
 const DATA_ENDPOINT = "./chart_data.json";
 const HIDDEN_CLASS = "visually-hidden";
 const DATA_TYPE_LINE = "line";
@@ -1243,10 +1240,6 @@ class Chart {
 
     return {
       hook: () => {
-        if (VERBOSE) {
-          console.log("animate vertical");
-        }
-
         let finishedAnimations = 0;
 
         for (let canvasType of chartTypesList) {
@@ -1280,9 +1273,6 @@ class Chart {
 
     return {
       hook: () => {
-        if (VERBOSE) {
-          console.log("animate horisontal scale");
-        }
         record.xRatioModifer += step;
 
         if (
@@ -1303,9 +1293,6 @@ class Chart {
 
     return {
       hook: () => {
-        if (VERBOSE) {
-          console.log("Hide chart");
-        }
         const record = this._transitions.chartsOpacity;
         record[type] += value ? 0.08 : -0.08;
 
@@ -1325,10 +1312,6 @@ class Chart {
 
     return {
       hook: () => {
-        if (VERBOSE) {
-          console.log("Dates opacity");
-        }
-
         record.datesOpacity += hide ? -0.06 : 0.06;
 
         if (
@@ -1356,10 +1339,6 @@ class Chart {
 
     return {
       hook: () => {
-        if (VERBOSE) {
-          console.log("Animate y axis");
-        }
-
         if (yAxis.opacity < 1) {
           yAxis.opacity += 0.08;
         }
@@ -1385,10 +1364,6 @@ class Chart {
   }
 
   _animationLoop() {
-    if (VERBOSE) {
-      console.log("animation tick");
-    }
-
     this._cleanUp();
 
     if (Object.keys(this._animations).length || this._state.drag.active) {

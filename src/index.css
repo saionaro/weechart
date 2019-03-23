@@ -88,11 +88,6 @@ body {
   cursor: pointer;
 }
 
-.chart__minimap-dragger--resizing,
-.chart__minimap-dragger:hover {
-  background-color: rgba(240, 247, 252, 0.6);
-}
-
 .chart__minimap-dragger-arrow {
   display: flex;
   justify-content: center;
@@ -257,11 +252,6 @@ body {
 
 .app--night .chart__minimap-dragger {
   border-color: rgba(59, 86, 109, 0.8);
-}
-
-.app--night .chart__minimap-dragger--dragging,
-.app--night .chart__minimap-dragger:hover {
-  background-color: rgba(29, 42, 57, 0.8);
 }
 
 .app--night .chart__minimap-dragger::before,

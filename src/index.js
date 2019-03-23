@@ -1,6 +1,5 @@
 /**
  * TODO
- * * (!) Touch events
  * * Refactor code
  * * Optimize _getXParams
  * * Add waves to checkbox
@@ -77,10 +76,17 @@ const _$TelegramCharts = {
   listenersActivated: false,
   mousemoveConsumers: [],
   mouseupConsumers: [],
+  touchmoveConsumers: [],
   onMouseUp: event => {
     const mouseupConsumers = _$TelegramCharts.mouseupConsumers;
     for (let i = 0; i < mouseupConsumers.length; i++) {
       mouseupConsumers[i](event);
+    }
+  },
+  onTouchMove: event => {
+    const touchmoveConsumers = _$TelegramCharts.touchmoveConsumers;
+    for (let i = 0; i < touchmoveConsumers.length; i++) {
+      touchmoveConsumers[i](event);
     }
   },
   onMouseMove: event => {
@@ -100,6 +106,19 @@ const _$TelegramCharts = {
       _$TelegramCharts.onMouseUp,
       listenerOpts
     );
+
+    document.addEventListener(
+      "touchmove",
+      _$TelegramCharts.onTouchMove,
+      listenerOpts
+    );
+
+    document.addEventListener(
+      "touchend",
+      _$TelegramCharts.onMouseUp,
+      listenerOpts
+    );
+
     _$TelegramCharts.listenersActivated = true;
   }
 };
@@ -414,11 +433,11 @@ class Chart {
         rightElem: null,
         initialWidth: dragWidth,
         width: dragWidth,
-        downX: 0,
-        marginLeft: viewShift
+        marginLeft: viewShift,
+        savedTouchX: 0,
+        touchEventAdapterData: { movementX: 0 }
       }
     };
-
     const fragment = document.createDocumentFragment();
     const wrapper = document.createElement("div");
     const floatingWindow = this._state.floatingWindow;
@@ -458,16 +477,28 @@ class Chart {
     this._startDrag = this._startDrag.bind(this);
     this._moveDrag = this._moveDrag.bind(this);
     this._endDrag = this._endDrag.bind(this);
+    this._startDragTouchAdapter = this._startDragTouchAdapter.bind(this);
+    this._moveDragTouchAdapter = throttle(
+      this._moveDragTouchAdapter.bind(this),
+      16
+    );
+    this._floatMoveTouchAdapter = this._floatMoveTouchAdapter.bind(this);
     this._floatMouseMove = throttle(this._floatMouseMove.bind(this), 60);
     this._checkYScaleChange = throttle(this._checkYScaleChange.bind(this), 160);
     this._floatMouseLeave = this._floatMouseLeave.bind(this);
 
     dragger.addEventListener("mousedown", this._startDrag, listenerOpts);
+    dragger.addEventListener(
+      "touchstart",
+      this._startDragTouchAdapter,
+      listenerOpts
+    );
 
     if (!_$TelegramCharts.listenersActivated) {
       _$TelegramCharts.activateDragEvents();
     }
 
+    _$TelegramCharts.touchmoveConsumers.push(this._moveDragTouchAdapter);
     _$TelegramCharts.mouseupConsumers.push(this._endDrag);
     _$TelegramCharts.mousemoveConsumers.push(this._moveDrag);
     _$TelegramCharts.modeSwitcherData.updateHooks.push(this._animationLoop);
@@ -481,6 +512,12 @@ class Chart {
     this._float.canvas.addEventListener(
       "mouseleave",
       this._floatMouseLeave,
+      listenerOpts
+    );
+
+    this._float.canvas.addEventListener(
+      "touchstart",
+      this._floatMoveTouchAdapter,
       listenerOpts
     );
 
@@ -501,6 +538,11 @@ class Chart {
     this._findAllExtremums();
     this._render();
     this._renderButtons();
+  }
+
+  _floatMoveTouchAdapter(event) {
+    const touch = event.changedTouches[0];
+    this._floatMouseMove(touch);
   }
 
   _floatMouseMove(event) {
@@ -630,6 +672,14 @@ class Chart {
     store.current.max = max;
   }
 
+  _startDragTouchAdapter(event) {
+    this._floatMouseLeave();
+    this._startDrag({
+      which: 1,
+      target: event.target
+    });
+  }
+
   _startDrag(event) {
     if (event.which !== 1 || !event.target) return;
 
@@ -650,9 +700,25 @@ class Chart {
       }
     }
     this._state.drag.dragger.classList.add(className);
-    drag.downX = event.pageX;
     drag.active = true;
     this._animationLoop();
+  }
+
+  _moveDragTouchAdapter(event) {
+    const touch = event.changedTouches[0];
+    const { drag } = this._state;
+    const savedX = drag.savedTouchX;
+    const currentX = touch.clientX;
+    let speed = 0;
+
+    if (savedX) {
+      speed = currentX - savedX;
+    }
+
+    drag.savedTouchX = currentX;
+    drag.touchEventAdapterData.movementX = speed;
+
+    this._moveDrag(drag.touchEventAdapterData);
   }
 
   _moveDrag({ movementX }) {
@@ -758,7 +824,7 @@ class Chart {
     drag.active = false;
     drag.leftArrow = false;
     drag.resize = false;
-    drag.downX = 0;
+    drag.savedTouchX = 0;
     drag.dragger.classList.remove("chart__minimap-dragger--resizing");
     drag.dragger.classList.remove("chart__minimap-dragger--dragging");
     drag.leftElem.classList.remove(ACTIVE_ARROW_CLASS);

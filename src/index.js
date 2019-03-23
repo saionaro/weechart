@@ -1,7 +1,3 @@
-/**
- * TODO
- * * Dont forget the Autoprefixer
- */
 const DATA_ENDPOINT = "./chart_data.json";
 const HIDDEN_CLASS = "visually-hidden";
 const DATA_TYPE_LINE = "line";

@@ -207,6 +207,29 @@ body {
   transition: 0s;
 }
 
+@-moz-document url-prefix() {
+  .checkbox__title::before {
+    content: "";
+    display: block;
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    top: 10px;
+    left: 10px;
+    border-radius: 50%;
+    background-color: #ffffff;
+    transform: scale(0);
+    transition-property: -webkit-transform;
+    transition-property: transform;
+    transition-property: transform, -webkit-transform;
+    transition-duration: 0.4s;
+  }
+
+  .checkbox__input:not(:checked) ~ .checkbox__title::before {
+    transform: scale(1);
+  }
+}
+
 @-webkit-keyframes clickCircle {
   0% {
     opacity: 1;
@@ -375,4 +398,8 @@ body {
   color: #ffffff;
   box-shadow: 0 0 1px rgba(0, 0, 0, 0.3);
   background-color: #233242;
+}
+
+.app--night .checkbox__title::before {
+  background-color: #222f3f;
 }

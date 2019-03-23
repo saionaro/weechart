@@ -103,7 +103,7 @@ body {
 .chart__minimap-dragger-arrow::before {
   transition-property: transform, opacity;
   transition-duration: 0.35s;
-  transform: scale(0.1);
+  transform: scale(0.3);
   opacity: 0;
   content: "";
   width: 80px;
@@ -283,7 +283,7 @@ body {
 .floating-window__section {
   display: flex;
   flex-direction: column;
-  width: 34%;
+  min-width: 34%;
   margin-top: 8px;
 }
 
@@ -293,6 +293,7 @@ body {
 
 .floating-window__section:nth-of-type(2n) {
   text-align: right;
+  margin-left: 12px;
 }
 
 .floating-window__count {

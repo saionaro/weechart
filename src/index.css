@@ -18,7 +18,6 @@ body {
 
 .hide-selection {
   user-select: none;
-  outline: none;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -125,10 +124,9 @@ body {
 }
 
 .checkbox {
-  display: flex;
-  align-items: center;
+  display: block;
+  position: relative;
   border: 1px solid #e5ecf1;
-  padding: 0 16px 0 7px;
   border-radius: 20px;
   cursor: pointer;
   color: #42484b;
@@ -136,6 +134,73 @@ body {
   transition-duration: 0.5s;
   font-size: 14px;
   height: 38px;
+}
+
+.checkbox::before {
+  content: "";
+  left: -2px;
+  height: 40px;
+  width: 40px;
+  display: block;
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0);
+}
+
+.checkbox--amimated::before {
+  animation: clickCircle 0.4s linear;
+}
+
+.checkbox__wrapper {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 100%;
+  width: 100%;
+  border-radius: 20px;
+  padding: 0 16px 0 7px;
+  transform: translate3d(0, 0, 0);
+  overflow: hidden;
+}
+
+.checkbox__wrapper::after {
+  content: "";
+  display: block;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  background-image: radial-gradient(circle, #cccccc 10%, transparent 10.01%);
+  background-repeat: no-repeat;
+  background-position: -1px;
+  opacity: 0;
+}
+
+.checkbox--amimated .checkbox__wrapper::after {
+  transform: scale(10, 10);
+  transition: transform 0.5s, opacity 1s;
+}
+
+.checkbox:not(.checkbox--amimated) .checkbox__wrapper::after {
+  transform: scale(0, 0);
+  opacity: 0.2;
+  transition: 0s;
+}
+
+@keyframes clickCircle {
+  0% {
+    opacity: 1;
+    transform: scale(0);
+    box-shadow: 0 0 0 20px rgb(208, 222, 234);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+    box-shadow: 0 0 0 7px rgb(208, 222, 234);
+  }
 }
 
 .checkbox__title {
@@ -225,11 +290,6 @@ body {
 .floating-window__section:nth-of-type(2n) {
   text-align: right;
 }
-/* 
-.floating-window__section:not(.floating-window__section--hidden)
-  ~ .floating-window__section {
-  margin-left: 8px;
-} */
 
 .floating-window__count {
   font-weight: 600;

@@ -1,9 +1,8 @@
 /**
  * TODO
- * * Refactor code
  * * Optimize _getXParams
- * * Add waves to checkbox
  * * Heal svg at firefox
+ * * Dont forget the Autoprefixer
  */
 
 const VERBOSE = false;
@@ -1030,6 +1029,7 @@ class Chart {
   _renderChart(canvasParams, { scale, shift, window }) {
     const { context, height, type: canvasType } = canvasParams;
     const {
+      _dataCount,
       _hiddenDates: hiddenDates,
       _lines: lines,
       _transitions: { chartsOpacity, datesOpacity }
@@ -1066,7 +1066,7 @@ class Chart {
           context.lineTo(x, y);
 
           if (isChart && !datesPainted) {
-            const isLast = i === window[1] - 1;
+            const isLast = i === _dataCount - 1;
             const hide = hiddenDates.current[i] && !hiddenDates.prev[i];
             const show = !hiddenDates.current[i] && hiddenDates.prev[i];
             const isTransition = show || hide;
@@ -1104,18 +1104,20 @@ class Chart {
     for (let column of _lines) {
       const type = column.type;
 
-      items += `<li class="charts-selector__item">
+      items += `<li class="charts-selector__item hide-selection">
         <label class="checkbox" style="color: ${rgbToString(
           this._rgbColors[type]
         )}">
-          <input
-            type="checkbox"
-            class="checkbox__input ${HIDDEN_CLASS}"
-            name="${type}"
-            checked
-          >
-          ${CheckedIcon}
-          <span class="checkbox__title">${data.names[type]}</span>
+          <div class="checkbox__wrapper">
+            <input
+              type="checkbox"
+              class="checkbox__input ${HIDDEN_CLASS}"
+              name="${type}"
+              checked
+            >
+            ${CheckedIcon}
+            <span class="checkbox__title">${data.names[type]}</span>
+          </div>
         </label>
       </li>`;
     }
@@ -1148,6 +1150,11 @@ class Chart {
     }
 
     this._animationLoop();
+    const labelElem = target.parentNode.parentNode;
+    labelElem.classList.add("checkbox--amimated");
+    setTimeout(() => {
+      labelElem.classList.remove("checkbox--amimated");
+    }, 500);
   }
 
   _pushAnimation(animation) {

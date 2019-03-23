@@ -712,7 +712,7 @@ class Chart {
       }
     }
 
-    if (max !== -Infinity) {
+    if (max !== -Infinity && min / max > 0.5) {
       max += min;
     }
 
@@ -864,7 +864,7 @@ class Chart {
     const extrCurr = this._localExtremums.current;
     this._findAllExtremums();
 
-    if (extrPrev.max !== extrCurr.max || extrPrev.min !== extrCurr.min) {
+    if (extrPrev.max !== extrCurr.max) {
       this._pushAnimation(this._animateVertical(this._findYDeltas()));
       this._pushAnimation(this._animateYAxis(extrPrev.max < extrCurr.max));
     }
@@ -883,7 +883,16 @@ class Chart {
   }
 
   _shouldRenderMinimap() {
+    let opacityInProcess = false;
+    for (let column of this._lines) {
+      const val = this._transitions.chartsOpacity[column.type];
+      if (val > 0 && val < 1) {
+        opacityInProcess = true;
+        break;
+      }
+    }
     return (
+      opacityInProcess ||
       !!this._transitions[canvasTypesEnum.Minimap].yRatioModifer ||
       this._minimapCleaned
     );

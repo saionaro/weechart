@@ -1,7 +1,5 @@
 /**
  * TODO
- * * Optimize _getXParams
- * * Heal svg at firefox
  * * Dont forget the Autoprefixer
  */
 
@@ -532,12 +530,13 @@ class Chart {
 
     this._localExtremums = createExtremumStore();
     this._globalExtremums = createExtremumStore();
+    this._chartXParams = { scale: 0, shift: 0, window: [] };
+    this._minimapXParams = { scale: 0, shift: 0, window: [] };
 
-    const hiddenDates = this._getHiddenDates(
-      this._dataCount,
-      this._getXParams(this._chart).window,
-      w
-    );
+    this._storeXParams(this._minimapXParams, this._minimap);
+    this._storeXParams(this._chartXParams, this._chart);
+
+    const hiddenDates = this._getHiddenDates(this._dataCount, w);
 
     this._hiddenDates = {
       prev: hiddenDates,
@@ -561,7 +560,7 @@ class Chart {
 
     if (active || !this._visibleCount) return;
 
-    const { scale, shift } = this._getXParams(this._chart);
+    const { scale, shift } = this._chartXParams;
     const cursorX = getCursorXPosition(this._float.canvas, event);
     const selected = Math.round((cursorX - shift) / scale);
     this._drawFloatingLine(selected, selected * scale + shift);
@@ -646,10 +645,8 @@ class Chart {
   }
 
   _findAllExtremums() {
-    this._findExtremums(
-      this._localExtremums,
-      this._getXParams(this._chart).window
-    );
+    const { window } = this._chartXParams;
+    this._findExtremums(this._localExtremums, window);
     this._findExtremums(this._globalExtremums);
   }
 
@@ -752,6 +749,7 @@ class Chart {
     drag.marginLeft = val;
 
     this._transitions.xShift = val / this._minimap.width;
+    this._storeXParams(this._chartXParams, this._chart);
     this._checkYScaleChange();
   }
 
@@ -801,6 +799,7 @@ class Chart {
         deltaRatio * record.xRatioModifer
       )
     );
+    this._storeXParams(this._chartXParams, this._chart);
     this._checkYScaleChange();
     this._checkHiddenDatesChange();
   }
@@ -810,7 +809,6 @@ class Chart {
 
     const hiddenDates = this._getHiddenDates(
       this._dataCount,
-      this._getXParams(this._chart).window,
       this._chart.width
     );
 
@@ -862,7 +860,7 @@ class Chart {
     this._chart.context.lineWidth = 1;
     this._renderLines(this._chart);
     this._chart.context.lineWidth = 2.5;
-    const xParams = this._getXParams(this._chart);
+    const xParams = this._chartXParams;
     this._renderChart(this._chart, xParams);
     this._renderYValues(this._chart, xParams);
   }
@@ -871,7 +869,7 @@ class Chart {
     const { context, height, width } = this._minimap;
     const { drag } = this._state;
     context.fillStyle = getColor("MinimapBackground");
-    this._renderChart(this._minimap, this._getXParams(this._minimap));
+    this._renderChart(this._minimap, this._minimapXParams);
     context.fillRect(0, 0, drag.marginLeft, height);
     context.fillRect(drag.marginLeft + drag.width, 0, width, height);
   }
@@ -965,7 +963,7 @@ class Chart {
     }
   }
 
-  _getXParams({ width, type }) {
+  _storeXParams(store, { width, type }) {
     const {
       _transitions: { xShift, [type]: record },
       _dataCount: count
@@ -973,21 +971,18 @@ class Chart {
     const countM1 = count - 1;
     const scale = (width / countM1) * record.xRatioModifer;
 
-    const params = {
-      scale,
-      shift: -(countM1 * scale * xShift),
-      window: [0, count]
-    };
+    store.scale = scale;
+    store.shift = -(countM1 * scale * xShift);
+    store.window[0] = 0;
+    store.window[1] = count;
 
     if (type === canvasTypesEnum.Chart) {
-      const start = Math.round(-params.shift / params.scale) - 1;
-      const end = Math.round((width - params.shift) / params.scale) + 2;
+      const start = Math.round(-store.shift / store.scale) - 1;
+      const end = Math.round((width - store.shift) / store.scale) + 2;
 
-      params.window[0] = start < 0 ? 0 : start;
-      params.window[1] = end > count ? count : end;
+      store.window[0] = start < 0 ? 0 : start;
+      store.window[1] = end > count ? count : end;
     }
-
-    return params;
   }
 
   _getYParams({ height, type }) {
@@ -1003,7 +998,8 @@ class Chart {
     );
   }
 
-  _getHiddenDates(total, window, width) {
+  _getHiddenDates(total, width) {
+    const { window } = this._chartXParams;
     const toHide = {};
     let count = window[1] - window[0];
     let iter = 1;

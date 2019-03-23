@@ -103,7 +103,7 @@ body {
 .chart__minimap-dragger-arrow::before {
   transition-property: transform, opacity;
   transition-duration: 0.35s;
-  transform: scale(0.3);
+  transform: scale(0.1);
   opacity: 0;
   content: "";
   width: 80px;
@@ -121,6 +121,10 @@ body {
 
 .chart__minimap-dragger-arrow--right {
   margin-left: auto;
+}
+
+.chart__minimap-background-canvas {
+  position: absolute;
 }
 
 .checkbox {

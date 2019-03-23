@@ -12,7 +12,7 @@ const ACTIVE_ARROW_CLASS = "chart__minimap-dragger-arrow--active";
 const LINES_COUNT = 6;
 const SCALE_RATE = 1;
 const MINIMAP_HEIGHT = 50;
-const INITIAL_X_SCALE = 5.35;
+const MINIMAL_DRAG_WIDTH = 40;
 const ANIMATION_STEPS = 16;
 const DATES_PLACE = 65;
 const Y_AXIS_ANIMATION_SHIFT = 180;
@@ -121,6 +121,7 @@ const _$TelegramCharts = {
 
 const canvasTypesEnum = {
   Minimap: "minimap",
+  MinimapBackground: "minimap-background",
   Chart: "chart",
   Float: "float"
 };
@@ -363,6 +364,7 @@ class Chart {
     this._dates = null;
     this._dataCount = data.columns[0].length - 1;
     this._visibleCount = 0;
+    this._minimapCleaned = false;
 
     this._chart = createCanvasObject(canvasTypesEnum.Chart, w, h);
     this._chart.height -= DATE_MARGIN;
@@ -378,11 +380,36 @@ class Chart {
       w,
       MINIMAP_HEIGHT
     );
+
+    this._minimapBackground = createCanvasObject(
+      canvasTypesEnum.MinimapBackground,
+      w,
+      MINIMAP_HEIGHT
+    );
+    this._minimapBackground.canvas.className =
+      "chart__minimap-background-canvas hide-selection";
+    this._minimapBackground.context = this._minimapBackground.canvas.getContext(
+      "2d"
+    );
+
     this._minimap.canvas.className = "chart__minimap-canvas hide-selection";
     this._minimap.context = this._minimap.canvas.getContext("2d");
 
     this._rgbColors = {};
     this._animations = [];
+
+    const pixelsForDot = w / this._dataCount;
+
+    let startScale = 1;
+
+    if (pixelsForDot < 35) {
+      startScale = 35 / pixelsForDot;
+
+      let dragWidth = w / startScale;
+      if (dragWidth < MINIMAL_DRAG_WIDTH) {
+        startScale = w / MINIMAL_DRAG_WIDTH;
+      }
+    }
 
     this._transitions = {
       [canvasTypesEnum.Minimap]: {
@@ -391,7 +418,7 @@ class Chart {
       },
       [canvasTypesEnum.Chart]: {
         yRatioModifer: 0,
-        xRatioModifer: INITIAL_X_SCALE
+        xRatioModifer: startScale
       },
       chartsOpacity: {},
       datesOpacity: 1,
@@ -421,7 +448,7 @@ class Chart {
 
     this._container = container;
     this._checkboxContainer = null;
-    const dragWidth = w / INITIAL_X_SCALE;
+    const dragWidth = w / startScale;
     const viewShift = w - dragWidth;
     this._state = {
       exclude: {},
@@ -472,6 +499,7 @@ class Chart {
 
     wrapper.className = "chart__minimap-wrapper";
     wrapper.appendChild(this._minimap.canvas);
+    wrapper.appendChild(this._minimapBackground.canvas);
     wrapper.appendChild(dragger);
     fragment.appendChild(this._chart.canvas);
     fragment.appendChild(this._float.canvas);
@@ -545,6 +573,7 @@ class Chart {
 
     this._findAllExtremums();
     this._render();
+    this._drawMinimap();
     this._renderButtons();
   }
 
@@ -758,7 +787,7 @@ class Chart {
 
     if (drag.leftArrow) {
       if (
-        drag.width - delta < drag.initialWidth / 2 ||
+        drag.width - delta < MINIMAL_DRAG_WIDTH ||
         drag.marginLeft + delta < 0
       ) {
         return;
@@ -776,7 +805,7 @@ class Chart {
     const maxPadding = this._minimap.width - drag.width;
 
     if (
-      drag.width + delta < drag.initialWidth / 2 ||
+      drag.width + delta < MINIMAL_DRAG_WIDTH ||
       drag.marginLeft + delta > maxPadding
     ) {
       return;
@@ -845,6 +874,22 @@ class Chart {
     drag.rightElem.classList.remove(ACTIVE_ARROW_CLASS);
   }
 
+  _shouldRenderMinimap() {
+    return (
+      !!this._transitions[canvasTypesEnum.Minimap].yRatioModifer ||
+      this._minimapCleaned
+    );
+  }
+
+  _cleanUp() {
+    this._clear(this._chart.canvas);
+    if (this._shouldRenderMinimap()) {
+      this._clear(this._minimap.canvas);
+      this._minimapCleaned = true;
+    }
+    this._clear(this._minimapBackground.canvas);
+  }
+
   _clear(canvas) {
     const context = canvas.getContext("2d");
     context.setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
@@ -853,7 +898,11 @@ class Chart {
 
   _render() {
     this._drawChart();
-    this._drawMinimap();
+    if (this._shouldRenderMinimap()) {
+      this._drawMinimap();
+      this._minimapCleaned = false;
+    }
+    this._drawMinimapBackground();
   }
 
   _drawChart() {
@@ -866,10 +915,13 @@ class Chart {
   }
 
   _drawMinimap() {
-    const { context, height, width } = this._minimap;
+    this._renderChart(this._minimap, this._minimapXParams);
+  }
+
+  _drawMinimapBackground() {
+    const { context, height, width } = this._minimapBackground;
     const { drag } = this._state;
     context.fillStyle = getColor("MinimapBackground");
-    this._renderChart(this._minimap, this._minimapXParams);
     context.fillRect(0, 0, drag.marginLeft, height);
     context.fillRect(drag.marginLeft + drag.width, 0, width, height);
   }
@@ -1003,9 +1055,13 @@ class Chart {
     const toHide = {};
     let count = window[1] - window[0];
     let iter = 1;
+    let hiddenCount = 0;
 
     while (count * DATES_PLACE > width) {
       for (let i = total - 1 - iter; i >= 0; i -= 2 * iter) {
+        if (!toHide[i]) {
+          hiddenCount++;
+        }
         toHide[i] = true;
       }
 
@@ -1017,7 +1073,7 @@ class Chart {
       iter++;
     }
 
-    toHide._$count = Object.keys(toHide).length;
+    toHide._$count = hiddenCount;
 
     return toHide;
   }
@@ -1333,8 +1389,7 @@ class Chart {
       console.log("animation tick");
     }
 
-    this._clear(this._chart.canvas);
-    this._clear(this._minimap.canvas);
+    this._cleanUp();
 
     if (Object.keys(this._animations).length || this._state.drag.active) {
       for (let key in this._animations) {

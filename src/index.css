@@ -36,7 +36,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 64px;
+  padding: 10vh 0;
   background-color: #ffffff;
   transition-property: background-color;
   transition-duration: 0.5s;
@@ -185,7 +185,8 @@ body {
 
 .floating-window {
   position: absolute;
-  display: inline-flex;
+  max-width: 180px;
+  box-sizing: border-box;
   flex-direction: column;
   padding: 10px 12px;
   border-radius: 4px;
@@ -198,29 +199,37 @@ body {
 
 .floating-window__date {
   margin: 0;
+  text-align: center;
 }
 
 .floating-window__sections {
   list-style: none;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  margin: 8px 0 0 0;
+  margin: 0;
   padding: 0;
 }
 
 .floating-window__section {
   display: flex;
   flex-direction: column;
+  width: 34%;
+  margin-top: 8px;
 }
 
 .floating-window__section--hidden {
   display: none;
 }
 
+.floating-window__section:nth-of-type(2n) {
+  text-align: right;
+}
+/* 
 .floating-window__section:not(.floating-window__section--hidden)
   ~ .floating-window__section {
   margin-left: 8px;
-}
+} */
 
 .floating-window__count {
   font-weight: 600;

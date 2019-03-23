@@ -3,6 +3,7 @@
  * * Refactor code
  * * Optimize _getXParams
  * * Add waves to checkbox
+ * * Heal svg at firefox
  */
 
 const VERBOSE = false;
@@ -13,14 +14,12 @@ const DATA_TYPE_LINE = "line";
 const ACTIVE_ARROW_CLASS = "chart__minimap-dragger-arrow--active";
 const LINES_COUNT = 6;
 const SCALE_RATE = 1;
-const MINIMAP_HEIGHT = 60;
+const MINIMAP_HEIGHT = 50;
 const INITIAL_X_SCALE = 5.35;
 const ANIMATION_STEPS = 16;
 const DATES_PLACE = 65;
 const Y_AXIS_ANIMATION_SHIFT = 180;
 const DATE_MARGIN = 16;
-const CHART_WIDTH = 800;
-const CHART_HEIGHT = 400;
 const HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
 const PIXEL_RATIO = (() => {
   const ctx = document.createElement("canvas").getContext("2d");
@@ -278,6 +277,17 @@ const toDateString = timestamp => {
   return cachedDates[timestamp];
 };
 
+const chortcutNumber = number => {
+  let res = number;
+  if (number > 1000000) {
+    return (number / 1000000).toFixed(1) + "M";
+  }
+  if (number > 1000) {
+    return (number / 1000).toFixed(1) + "K";
+  }
+  return res;
+};
+
 const cachedWeekdays = {};
 
 const toWeekday = timestamp => {
@@ -359,11 +369,11 @@ class Chart {
 
     this._chart = createCanvasObject(canvasTypesEnum.Chart, w, h);
     this._chart.height -= DATE_MARGIN;
-    this._chart.canvas.className = "chart__chart-canvas";
+    this._chart.canvas.className = "chart__chart-canvas hide-selection";
     this._chart.context = this._chart.canvas.getContext("2d");
 
     this._float = createCanvasObject(canvasTypesEnum.Float, w, h);
-    this._float.canvas.className = "chart__float-canvas";
+    this._float.canvas.className = "chart__float-canvas hide-selection";
     this._float.context = this._float.canvas.getContext("2d");
 
     this._minimap = createCanvasObject(
@@ -371,7 +381,7 @@ class Chart {
       w,
       MINIMAP_HEIGHT
     );
-    this._minimap.canvas.className = "chart__minimap-canvas";
+    this._minimap.canvas.className = "chart__minimap-canvas hide-selection";
     this._minimap.context = this._minimap.canvas.getContext("2d");
 
     this._rgbColors = {};
@@ -559,7 +569,7 @@ class Chart {
   }
 
   _drawFloatingLine(index, x) {
-    const { canvas, context, height } = this._float;
+    const { canvas, context, height, width } = this._float;
     const { chartsOpacity } = this._transitions;
     this._clear(canvas);
 
@@ -576,6 +586,7 @@ class Chart {
     const data = {
       date: 0,
       x,
+      toLeft: width / 2 < x,
       values: {}
     };
 
@@ -598,7 +609,7 @@ class Chart {
     this._updateFloatingWindow(data);
   }
 
-  _updateFloatingWindow({ x, date, values }) {
+  _updateFloatingWindow({ x, date, toLeft, values }) {
     const {
       floatingWindow: { elem, dateElem, labels }
     } = this._state;
@@ -606,9 +617,15 @@ class Chart {
     dateElem.innerHTML = `${toWeekday(date)}, ${toDateString(date)}`;
 
     for (const type in values) {
-      labels[type].innerHTML = values[type];
+      labels[type].innerHTML = chortcutNumber(values[type]);
     }
-    setTransform(elem.style, x + 15);
+    let shift;
+    if (toLeft) {
+      shift = x - elem.offsetWidth - 15;
+    } else {
+      shift = x + 15;
+    }
+    setTransform(elem.style, shift);
   }
 
   _hideFloatingWindowLabel(type, hide) {
@@ -922,7 +939,11 @@ class Chart {
 
         if (y < maxHeight) {
           context.fillStyle = rgbToString(color, yAxis.opacity);
-          context.fillText(Math.round(current.max * part), -shift, y);
+          context.fillText(
+            chortcutNumber(Math.round(current.max * part)),
+            -shift,
+            y
+          );
         }
 
         if (yAxis.opacity < 1) {
@@ -932,7 +953,11 @@ class Chart {
 
           if (yCoord < maxHeight) {
             context.fillStyle = rgbToString(color, 1 - yAxis.opacity);
-            context.fillText(Math.round(prev.max * part), -shift, yCoord);
+            context.fillText(
+              chortcutNumber(Math.round(prev.max * part)),
+              -shift,
+              yCoord
+            );
           }
         }
       }
@@ -1108,6 +1133,7 @@ class Chart {
 
   _onChangeCheckbox({ target }) {
     const extremums = this._localExtremums;
+    this._floatMouseLeave();
     this._pushAnimation(this._animateHideChart(target.name, target.checked));
     this._state.exclude[target.name] = !target.checked;
     this._visibleCount += this._state.exclude[target.name] ? -1 : 1;
@@ -1321,13 +1347,13 @@ class Chart {
 
 const onFetchData = data => {
   const fragment = document.createDocumentFragment();
+  const w = document.documentElement.clientWidth * 0.8;
+  const h = 400;
 
   for (let i = 0; i < data.length; i++) {
     const chartContainer = document.createElement("div");
     chartContainer.className = "chart";
-    requestAnimationFrame(() => {
-      new Chart(chartContainer, data[i], { w: CHART_WIDTH, h: CHART_HEIGHT });
-    });
+    new Chart(chartContainer, data[i], { w, h });
     fragment.appendChild(chartContainer);
   }
 

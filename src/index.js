@@ -1,3 +1,7 @@
+/**
+ * Improve performance (reduce points after dot, for example)
+ * => es5
+ */
 const DATA_ENDPOINT = "./chart_data.json";
 const HIDDEN_CLASS = "visually-hidden";
 const DATA_TYPE_LINE = "line";
@@ -267,7 +271,7 @@ const toDateString = timestamp => {
   return cachedDates[timestamp];
 };
 
-const chortcutNumber = number => {
+const short = number => {
   let res = number;
   if (number > 1000000) {
     return (number / 1000000).toFixed(1) + "M";
@@ -364,6 +368,8 @@ class Chart {
     }
     this._visibleCount = 0;
     this._minimapCleaned = false;
+    this._forceRenderDates = true;
+    this._datesCleaned = false;
     this._chart = createCanvasObject(canvasTypesEnum.Chart, w, h);
     this._chart.height -= DATE_MARGIN;
     this._yAxisAnimationShift = (this._chart.height / LINES_COUNT) * 3;
@@ -506,6 +512,7 @@ class Chart {
     this._transitions.xShift = viewShift / this._minimap.width;
 
     wrapper.className = "chart__minimap-wrapper";
+    wrapper.style.width = `${w}px`;
     wrapper.appendChild(this._minimap.canvas);
     wrapper.appendChild(this._minimapBackground.canvas);
     wrapper.appendChild(dragger);
@@ -514,6 +521,7 @@ class Chart {
     fragment.appendChild(this._state.floatingWindow.elem);
     fragment.appendChild(wrapper);
     this._container.appendChild(fragment);
+    this._container.style.width = `${w}px`;
 
     this._onChangeCheckbox = this._onChangeCheckbox.bind(this);
     this._animationLoop = this._animationLoop.bind(this);
@@ -652,7 +660,7 @@ class Chart {
     dateElem.innerHTML = `${toWeekday(date)}, ${toDateString(date)}`;
 
     for (const type in values) {
-      labels[type].innerHTML = chortcutNumber(values[type]);
+      labels[type].innerHTML = short(values[type]);
     }
     let shift;
     if (toLeft) {
@@ -776,9 +784,12 @@ class Chart {
 
     if (!drag.active || !movementX) return;
 
+    this._forceRenderDates = true;
+
     if (drag.resize) {
       return this._handleResize(movementX);
     }
+
     const maxPadding = this._minimap.width - drag.width;
     const sum = drag.marginLeft + movementX;
     const val = sum < 0 ? 0 : sum > maxPadding ? maxPadding : sum;
@@ -898,18 +909,41 @@ class Chart {
     );
   }
 
+  _shouldRenderDates() {
+    if (this._transitions.datesOpacity !== 1) {
+      return true;
+    }
+    return this._forceRenderDates || this._datesCleaned;
+  }
+
   _cleanUp() {
-    this._clear(this._chart.canvas);
+    this._clearChart();
+
     if (this._shouldRenderMinimap()) {
       this._clear(this._minimap.canvas);
       this._minimapCleaned = true;
     }
+
+    if (this._shouldRenderDates()) {
+      this._clearDates();
+      this._datesCleaned = true;
+    }
+
     this._clear(this._minimapBackground.canvas);
+  }
+
+  _clearChart() {
+    const { width, height, context } = this._chart;
+    context.clearRect(0, 0, width, height);
+  }
+
+  _clearDates() {
+    const { width, height, context } = this._chart;
+    context.clearRect(0, height, width, height + DATE_MARGIN);
   }
 
   _clear(canvas) {
     const context = canvas.getContext("2d");
-    context.setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
     context.clearRect(0, 0, canvas.width, canvas.height);
   }
 
@@ -918,6 +952,11 @@ class Chart {
     if (this._shouldRenderMinimap()) {
       this._drawMinimap();
       this._minimapCleaned = false;
+    }
+    if (this._shouldRenderDates()) {
+      this._renderDates();
+      this._datesCleaned = false;
+      this._forceRenderDates = false;
     }
     this._drawMinimapBackground();
   }
@@ -981,7 +1020,38 @@ class Chart {
     }
 
     context.stroke();
-    context.closePath();
+  }
+
+  _renderDates() {
+    const { context, height } = this._chart;
+    const { scale, shift, window } = this._chartXParams;
+    const {
+      _dataCount,
+      _hiddenDates: hiddenDates,
+      _transitions: { datesOpacity }
+    } = this;
+
+    for (let i = window[0]; i < window[1]; i++) {
+      const x = i * scale + shift;
+
+      const isLast = i === _dataCount - 1;
+      const hide = hiddenDates.current[i] && !hiddenDates.prev[i];
+      const show = !hiddenDates.current[i] && hiddenDates.prev[i];
+      const isTransition = show || hide;
+      let opacity = 1;
+
+      context.textAlign = isLast ? "right" : "center";
+      context.lineWidth = 1;
+
+      if (isTransition) {
+        opacity = datesOpacity;
+      }
+
+      if (opacity && (isTransition || !hiddenDates.current[i])) {
+        context.fillStyle = rgbToString(getColor("ChartText"), opacity);
+        context.fillText(toDateString(this._dates[i]), x, height + 18);
+      }
+    }
   }
 
   _renderYValues({ context, height }, { shift }) {
@@ -997,6 +1067,8 @@ class Chart {
     context.lineWidth = 1;
 
     if (current.max !== -Infinity) {
+      context.textAlign = "left";
+
       for (let i = 1; i < LINES_COUNT; i++) {
         const yShift = maxHeight - i * stepSize;
         const y = yShift + yAxis.shift;
@@ -1004,11 +1076,7 @@ class Chart {
 
         if (y < maxHeight) {
           context.fillStyle = rgbToString(color, yAxis.opacity);
-          context.fillText(
-            chortcutNumber(Math.round(current.max * part)),
-            -shift,
-            y
-          );
+          context.fillText(short(Math.round(current.max * part)), 0, y);
         }
 
         if (yAxis.opacity < 1) {
@@ -1016,16 +1084,12 @@ class Chart {
 
           if (yCoord < maxHeight) {
             context.fillStyle = rgbToString(color, 1 - yAxis.opacity);
-            context.fillText(
-              chortcutNumber(Math.round(prev.max * part)),
-              -shift,
-              yCoord
-            );
+            context.fillText(short(Math.round(prev.max * part)), 0, yCoord);
           }
         }
       }
       context.fillStyle = rgbToString(color, 1);
-      context.fillText(0, -shift, maxHeight);
+      context.fillText(0, 0, maxHeight);
     }
   }
 
@@ -1095,66 +1159,29 @@ class Chart {
   _renderChart(canvasParams, { scale, shift, window }) {
     const { context, height, type: canvasType } = canvasParams;
     const {
-      _dataCount,
-      _hiddenDates: hiddenDates,
       _lines: lines,
-      _transitions: { chartsOpacity, datesOpacity }
+      _transitions: { chartsOpacity }
     } = this;
     const isChart = canvasType === canvasTypesEnum.Chart;
     const yScale = this._getYParams(canvasParams);
 
-    if (shift && isChart) {
-      context.translate(shift, 0);
-    }
-
-    const savedWidth = context.lineWidth;
-    const savedFillStyle = context.fillStyle;
-    const savedTextAlign = context.textAlign;
-
-    let datesPainted = false;
-
     for (let column of lines) {
       const type = column.type;
-      const opacityValue = chartsOpacity[type];
+      const opacity = chartsOpacity[type];
 
-      if (opacityValue !== 0) {
+      if (opacity !== 0) {
         context.beginPath();
-        context.strokeStyle = rgbToString(this._rgbColors[type], opacityValue);
+        context.strokeStyle = rgbToString(this._rgbColors[type], opacity);
 
         for (let i = window[0]; i < window[1]; i++) {
-          const x = i * scale;
+          const x = i * scale + (isChart ? shift : 0);
+
           let y = height - column.data[i] * yScale;
 
           context.lineTo(x, y);
-
-          if (isChart && !datesPainted) {
-            const isLast = i === _dataCount - 1;
-            const hide = hiddenDates.current[i] && !hiddenDates.prev[i];
-            const show = !hiddenDates.current[i] && hiddenDates.prev[i];
-            const isTransition = show || hide;
-            let opacity = 1;
-
-            context.textAlign = isLast ? "right" : "center";
-            context.lineWidth = 1;
-
-            if (isTransition) {
-              opacity = datesOpacity;
-            }
-
-            if (opacity && (isTransition || !hiddenDates.current[i])) {
-              context.fillStyle = rgbToString(getColor("ChartText"), opacity);
-              context.fillText(toDateString(this._dates[i]), x, height + 18);
-            }
-
-            context.lineWidth = savedWidth;
-            context.fillStyle = savedFillStyle;
-            context.textAlign = savedTextAlign;
-          }
         }
 
-        datesPainted = true;
         context.stroke();
-        context.closePath();
       }
     }
   }
@@ -1212,11 +1239,6 @@ class Chart {
     }
 
     this._animationLoop();
-    const labelElem = target.parentNode.parentNode;
-    labelElem.classList.add("checkbox--amimated");
-    setTimeout(() => {
-      labelElem.classList.remove("checkbox--amimated");
-    }, 500);
   }
 
   _pushAnimation(animation) {
@@ -1397,8 +1419,10 @@ class Chart {
 
 const onFetchData = data => {
   const fragment = document.createDocumentFragment();
-  const w = document.documentElement.clientWidth * 0.8;
-  const h = 400;
+  let w = document.documentElement.clientWidth * 0.8;
+  const h = 350;
+
+  w = w > 300 ? 300 : w;
 
   for (let i = 0; i < data.length; i++) {
     const chartContainer = document.createElement("div");

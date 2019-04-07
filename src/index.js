@@ -370,6 +370,7 @@ class Chart {
     this._minimapCleaned = false;
     this._forceRenderDates = true;
     this._datesCleaned = false;
+    this._activeAnimations = 0;
     this._chart = createCanvasObject(canvasTypesEnum.Chart, w, h);
     this._chart.height -= DATE_MARGIN;
     this._yAxisAnimationShift = (this._chart.height / LINES_COUNT) * 3;
@@ -1244,6 +1245,9 @@ class Chart {
   }
 
   _pushAnimation(animation) {
+    if (!this._animations[animation.tag]) {
+      this._activeAnimations++;
+    }
     this._animations[animation.tag] = animation.hook;
   }
 
@@ -1296,6 +1300,7 @@ class Chart {
 
         if (finishedAnimations === chartTypesList.length) {
           delete this._animations[tag];
+          this._activeAnimations--;
         }
       },
       tag
@@ -1319,6 +1324,7 @@ class Chart {
         ) {
           record.xRatioModifer = newVal;
           delete this._animations[tag];
+          this._activeAnimations--;
         }
       },
       tag
@@ -1334,8 +1340,9 @@ class Chart {
         record[type] += value ? 0.08 : -0.08;
 
         if ((record[type] <= 0 && !value) || (record[type] >= 1 && value)) {
-          delete this._animations[tag];
           record[type] = value ? 1 : 0;
+          delete this._animations[tag];
+          this._activeAnimations--;
         }
       },
       tag
@@ -1355,8 +1362,9 @@ class Chart {
           (record.datesOpacity <= 0 && hide) ||
           (record.datesOpacity >= 1 && !hide)
         ) {
-          delete this._animations[tag];
           record.datesOpacity = hide ? 0 : 1;
+          delete this._animations[tag];
+          this._activeAnimations--;
         }
       },
       tag
@@ -1398,6 +1406,7 @@ class Chart {
           yAxis.opacity = 1;
           yAxis.shift = 0;
           delete this._animations[tag];
+          this._activeAnimations--;
         }
       },
       tag
@@ -1407,7 +1416,7 @@ class Chart {
   _animationLoop() {
     this._cleanUp();
 
-    if (Object.keys(this._animations).length || this._state.drag.active) {
+    if (this._activeAnimations || this._state.drag.active) {
       for (let key in this._animations) {
         this._animations[key]();
       }

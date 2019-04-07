@@ -41,6 +41,12 @@ body {
   font-family: Helvetica, Arial, sans-serif;
 }
 
+.app__charts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+}
+
 .mode-switcher {
   margin-top: 64px;
 }
@@ -49,10 +55,7 @@ body {
   position: relative;
   display: flex;
   flex-direction: column;
-}
-
-.chart + .chart {
-  margin-top: 32px;
+  margin: 10px;
 }
 
 .chart__minimap-wrapper {

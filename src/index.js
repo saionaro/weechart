@@ -722,6 +722,8 @@ class Chart {
 
     if (max !== -Infinity && min / max > 0.5) {
       max += min;
+    } else {
+      max *= 1.05;
     }
 
     store.prev.min = store.current.min;

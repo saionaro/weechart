@@ -71,7 +71,13 @@ body {
   position: absolute;
 }
 
-.chart__minimap-canvas {
+.chart__minimap-canvas,
+.chart__minimap-background-canvas {
+  border-radius: 6px;
+}
+
+.chart__minimap-background-canvas {
+  position: absolute;
 }
 
 .chart__minimap-dragger {
@@ -79,14 +85,17 @@ body {
   justify-content: space-around;
   align-items: center;
   position: absolute;
-  top: 0;
+  top: -1px;
   background-color: transparent;
-  border: 2px solid rgba(219, 234, 244, 0.8);
-  border-left: none;
+  border: 1px solid #c0d1e1;
+  border-left: 0;
   border-right: 0;
-  transition-property: border-color, background-color;
+  transition-property: border-color, background-color, box-shadow;
   transition-duration: 0.5s;
   cursor: pointer;
+  border-radius: 7px;
+  overflow: hidden;
+  box-shadow: 0px 0px 0px 1px #ffffff;
 }
 
 .chart__minimap-dragger-arrow {
@@ -95,52 +104,56 @@ body {
   align-items: center;
   height: 100%;
   width: 10px;
-  background-color: rgba(219, 234, 244, 0.8);
-  transition-property: background-color;
+  background-color: #c0d1e1;
+  transition-property: background-color, border-color;
   transition-duration: 0.5s;
   cursor: pointer;
 }
 
 .chart__minimap-dragger-arrow::before {
-  opacity: 0;
   content: "";
-  width: 20px;
-  height: 20px;
+  width: 2px;
+  height: 10px;
+  border-radius: 2px;
   position: absolute;
+  background-color: #ffffff;
+  transition-property: transform;
+  transition-duration: 0.24s;
+  transform: scaleY(1);
+}
+
+.chart__minimap-dragger-arrow:hover::before {
+  transform: scaleY(1.2);
+}
+
+.chart__minimap-dragger-arrow--left {
+  border-right: 1px solid #fff;
 }
 
 .chart__minimap-dragger-arrow--right {
+  border-left: 1px solid #fff;
   margin-left: auto;
-}
-
-.chart__minimap-background-canvas {
-  position: absolute;
 }
 
 .checkbox {
   display: block;
   position: relative;
-  border: 1px solid #e5ecf1;
-  border-radius: 20px;
+  border: 2px solid #e5ecf1;
+  border-radius: 18px;
   cursor: pointer;
   color: #42484b;
   transition-property: border-color;
   transition-duration: 0.5s;
   font-size: 14px;
-  height: 38px;
+  height: 32px;
 }
 
-.checkbox::before {
-  content: "";
-  left: -2px;
-  height: 40px;
-  width: 40px;
-  display: block;
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0;
-  -webkit-transform: scale(0);
-  transform: scale(0);
+.checkbox__input:not(:checked) + .checkbox__wrapper {
+  background-color: #ffffff !important;
+}
+
+.checkbox__input:not(:checked) + .checkbox__wrapper .checkbox__title {
+  color: inherit !important;
 }
 
 .checkbox__wrapper {
@@ -149,87 +162,17 @@ body {
   box-sizing: border-box;
   height: 100%;
   width: 100%;
-  border-radius: 20px;
+  border-radius: 18px;
   padding: 0 16px 0 7px;
-  -webkit-transform: translate3d(0, 0, 0);
-  transform: translate3d(0, 0, 0);
   overflow: hidden;
-}
-
-.checkbox__wrapper::after {
-  content: "";
-  display: block;
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  background-image: radial-gradient(circle, #cccccc 10%, transparent 10.01%);
-  background-repeat: no-repeat;
-  background-position: -1px;
-  opacity: 0;
-}
-
-@-moz-document url-prefix() {
-  .checkbox__title::before {
-    content: "";
-    display: block;
-    position: absolute;
-    width: 18px;
-    height: 18px;
-    top: 10px;
-    left: 10px;
-    border-radius: 50%;
-    background-color: #ffffff;
-    transform: scale(0);
-    transition-property: -webkit-transform;
-    transition-property: transform;
-    transition-property: transform, -webkit-transform;
-    transition-duration: 0.4s;
-  }
-
-  .checkbox__input:not(:checked) ~ .checkbox__title::before {
-    transform: scale(1);
-  }
-}
-
-@-webkit-keyframes clickCircle {
-  0% {
-    opacity: 1;
-    -webkit-transform: scale(0);
-    transform: scale(0);
-    box-shadow: 0 0 0 20px rgb(208, 222, 234);
-  }
-
-  100% {
-    opacity: 0;
-    -webkit-transform: scale(1.5);
-    transform: scale(1.5);
-    box-shadow: 0 0 0 7px rgb(208, 222, 234);
-  }
-}
-
-@keyframes clickCircle {
-  0% {
-    opacity: 1;
-    -webkit-transform: scale(0);
-    transform: scale(0);
-    box-shadow: 0 0 0 20px rgb(208, 222, 234);
-  }
-
-  100% {
-    opacity: 0;
-    -webkit-transform: scale(1.5);
-    transform: scale(1.5);
-    box-shadow: 0 0 0 7px rgb(208, 222, 234);
-  }
+  transition-property: background-color;
+  transition-duration: 0.4s;
 }
 
 .checkbox__title {
-  color: #42484b;
-  margin-left: 10px;
+  color: #ffffff;
   transition-property: color;
-  transition-duration: 0.5s;
+  transition-duration: 0.4s;
 }
 
 .checked-icon {
@@ -237,29 +180,14 @@ body {
   width: 24px;
 }
 
-.checked-icon__anime-circle {
-  fill: white;
-  r: 0px;
-  transition-property: r;
-  transition-duration: 0.4s;
-}
-
 .checked-icon__done {
-  transition-property: -webkit-transform;
-  transition-property: transform;
-  transition-property: transform, -webkit-transform;
+  transition-property: opacity;
   transition-duration: 0.4s;
-  -webkit-transform: scale(1);
-  transform: scale(1);
+  opacity: 1;
 }
 
-.checkbox__input:not(:checked) + .checked-icon .checked-icon__anime-circle {
-  r: 17px;
-}
-
-.checkbox__input:not(:checked) + .checked-icon__done {
-  -webkit-transform: scale(0);
-  transform: scale(0);
+.checkbox__input:not(:checked) + div .checked-icon__done {
+  opacity: 0;
 }
 
 .charts-selector {
@@ -338,20 +266,18 @@ body {
   border-color: #304659;
 }
 
-.app--night .checked-icon__anime-circle {
-  fill: #222f3f;
-}
-
 .app--night .checkbox__title {
   color: #e7ecee;
 }
 
-.app--night .chart__minimap-dragger-arrow {
-  background-color: rgba(59, 86, 109, 0.8);
+.app--night .chart__minimap-dragger {
+  border-color: #56626d;
+  box-shadow: none;
 }
 
-.app--night .chart__minimap-dragger {
-  border-color: rgba(59, 86, 109, 0.8);
+.app--night .chart__minimap-dragger-arrow {
+  background-color: #56626d;
+  border-color: transparent;
 }
 
 .app--night .floating-window {
@@ -360,6 +286,6 @@ body {
   background-color: #233242;
 }
 
-.app--night .checkbox__title::before {
-  background-color: #222f3f;
+.app--night .checkbox__input:not(:checked) + .checkbox__wrapper {
+  background-color: #233242 !important;
 }

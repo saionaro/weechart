@@ -147,7 +147,7 @@ var colors = {
 };
 
 var CheckedIcon =
-  '<svg class="checked-icon" height="20" width="20" viewBox="0 0 40 40"> <circle cx="20" cy="20" r="18" stroke="currentColor" stroke-width="2" fill="currentColor" /><polyline class="checked-icon__done" points="13,22 18,27 27,17" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" stroke="white" fill="none" /><circle class="checked-icon__anime-circle" cx="20" cy="20" stroke="currentColor"/></svg>';
+  '<svg class="checked-icon" height="20" width="20" viewBox="0 0 40 40"> <polyline class="checked-icon__done" points="12,21 18,27 30,14" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" stroke="white" fill="none" /> </svg>';
 
 function hexToRgb(hex) {
   var result = HEX_REGEX.exec(hex);
@@ -281,7 +281,7 @@ function createDragger(width) {
   var arrowLeft = document.createElement("div");
   var arrowRight = document.createElement("div");
   dragger.className = "chart__minimap-dragger hide-selection";
-  dragger.style.height = MINIMAP_HEIGHT - 4 + "px";
+  dragger.style.height = MINIMAP_HEIGHT + "px";
   dragger.style.width = width + "px";
   arrowLeft.className =
     "chart__minimap-dragger-arrow chart__minimap-dragger-arrow--left";
@@ -853,7 +853,7 @@ var Chart = (function() {
     this._changeDragWidth(delta);
   };
 
-  Chart.prototype._changeDragWidth = function _changeDragWidth(delta) {
+  Chart.prototype._changeDragWidth = function(delta) {
     var record = this._transitions[canvasTypesEnum.Chart];
     var drag = this._state.drag;
     var changedWidth = drag.width + delta;
@@ -873,7 +873,7 @@ var Chart = (function() {
     this._checkHiddenDatesChange();
   };
 
-  Chart.prototype._checkHiddenDatesChange = function _checkHiddenDatesChange() {
+  Chart.prototype._checkHiddenDatesChange = function() {
     var dates = this._hiddenDates;
     var hiddenDates = this._getHiddenDates(this._dataCount, this._chart.width);
 
@@ -887,7 +887,7 @@ var Chart = (function() {
     }
   };
 
-  Chart.prototype._checkYScaleChange = function _checkYScaleChange() {
+  Chart.prototype._checkYScaleChange = function() {
     var extrPrev = this._localExtremums.prev;
     var extrCurr = this._localExtremums.current;
 
@@ -899,7 +899,7 @@ var Chart = (function() {
     }
   };
 
-  Chart.prototype._endDrag = function _endDrag() {
+  Chart.prototype._endDrag = function() {
     var drag = this._state.drag;
     drag.active = false;
     drag.leftArrow = false;
@@ -911,7 +911,7 @@ var Chart = (function() {
     drag.rightElem.classList.remove(ACTIVE_ARROW_CLASS);
   };
 
-  Chart.prototype._shouldRenderMinimap = function _shouldRenderMinimap() {
+  Chart.prototype._shouldRenderMinimap = function() {
     var opacityInProcess = false;
 
     for (var i = 0; i < this._lines.length; i++) {
@@ -931,7 +931,7 @@ var Chart = (function() {
     );
   };
 
-  Chart.prototype._shouldRenderDates = function _shouldRenderDates() {
+  Chart.prototype._shouldRenderDates = function() {
     if (this._transitions.datesOpacity !== 1) {
       return true;
     }
@@ -939,7 +939,7 @@ var Chart = (function() {
     return this._forceRenderDates || this._datesCleaned;
   };
 
-  Chart.prototype._cleanUp = function _cleanUp() {
+  Chart.prototype._cleanUp = function() {
     this._clearChart();
 
     if (this._shouldRenderMinimap()) {
@@ -953,11 +953,11 @@ var Chart = (function() {
     this._clear(this._minimapBackground.canvas);
   };
 
-  Chart.prototype._clearChart = function _clearChart() {
+  Chart.prototype._clearChart = function() {
     this._chart.context.clearRect(0, 0, this._chart.width, this._chart.height);
   };
 
-  Chart.prototype._clearDates = function _clearDates() {
+  Chart.prototype._clearDates = function() {
     this._chart.context.clearRect(
       0,
       this._chart.height,
@@ -966,12 +966,12 @@ var Chart = (function() {
     );
   };
 
-  Chart.prototype._clear = function _clear(canvas) {
+  Chart.prototype._clear = function(canvas) {
     var context = canvas.getContext("2d");
     context.clearRect(0, 0, canvas.width, canvas.height);
   };
 
-  Chart.prototype._render = function _render() {
+  Chart.prototype._render = function() {
     this._drawChart();
 
     if (this._shouldRenderMinimap()) {
@@ -986,7 +986,7 @@ var Chart = (function() {
     this._drawMinimapBackground();
   };
 
-  Chart.prototype._drawChart = function _drawChart() {
+  Chart.prototype._drawChart = function() {
     this._chart.context.lineWidth = 1;
     this._renderLines(this._chart);
     this._chart.context.lineWidth = 2.5;
@@ -994,24 +994,24 @@ var Chart = (function() {
     this._renderYValues();
   };
 
-  Chart.prototype._drawMinimap = function _drawMinimap() {
+  Chart.prototype._drawMinimap = function() {
     this._renderChart(this._minimap, this._minimapXParams);
   };
 
-  Chart.prototype._drawMinimapBackground = function _drawMinimapBackground() {
+  Chart.prototype._drawMinimapBackground = function() {
     var context = this._minimapBackground.context;
     var drag = this._state.drag;
     context.fillStyle = getColor("MinimapBackground");
-    context.fillRect(0, 0, drag.marginLeft, this._minimapBackground.height);
+    context.fillRect(0, 0, drag.marginLeft + 8, this._minimapBackground.height);
     context.fillRect(
-      drag.marginLeft + drag.width,
+      drag.marginLeft + drag.width - 8,
       0,
       this._minimapBackground.width,
       this._minimapBackground.height
     );
   };
 
-  Chart.prototype._renderLines = function _renderLines(chart) {
+  Chart.prototype._renderLines = function(chart) {
     var context = chart.context;
     var width = chart.width;
     var height = chart.height;
@@ -1052,7 +1052,7 @@ var Chart = (function() {
     context.stroke();
   };
 
-  Chart.prototype._renderDates = function _renderDates() {
+  Chart.prototype._renderDates = function() {
     var context = this._chart.context;
     var height = this._chart.height;
     var scale = this._chartXParams.scale;
@@ -1082,7 +1082,7 @@ var Chart = (function() {
     }
   };
 
-  Chart.prototype._renderYValues = function _renderYValues() {
+  Chart.prototype._renderYValues = function() {
     var context = this._chart.context;
     var height = this._chart.height;
     var current = this._localExtremums.current;
@@ -1122,7 +1122,7 @@ var Chart = (function() {
     }
   };
 
-  Chart.prototype._storeXParams = function _storeXParams(store, data) {
+  Chart.prototype._storeXParams = function(store, data) {
     var type = data.type;
     var xShift = this._transitions.xShift;
     var record = this._transitions[type];
@@ -1143,7 +1143,7 @@ var Chart = (function() {
     }
   };
 
-  Chart.prototype._getYParams = function _getYParams(data) {
+  Chart.prototype._getYParams = function(data) {
     var usedExtremums =
       data.type === canvasTypesEnum.Chart
         ? this._localExtremums
@@ -1154,7 +1154,7 @@ var Chart = (function() {
     );
   };
 
-  Chart.prototype._getHiddenDates = function _getHiddenDates(total, width) {
+  Chart.prototype._getHiddenDates = function(total, width) {
     var window = this._chartXParams.window;
     var toHide = {};
     var count = window[1] - window[0];
@@ -1183,7 +1183,7 @@ var Chart = (function() {
     return toHide;
   };
 
-  Chart.prototype._renderChart = function _renderChart(params, data) {
+  Chart.prototype._renderChart = function(params, data) {
     var context = params.context;
     var chartsOpacity = this._transitions.chartsOpacity;
     var isChart = params.type === canvasTypesEnum.Chart;
@@ -1209,7 +1209,7 @@ var Chart = (function() {
     }
   };
 
-  Chart.prototype._renderButtons = function _renderButtons() {
+  Chart.prototype._renderButtons = function() {
     var items = "";
     var data = this._data;
     var container = this._container;
@@ -1217,14 +1217,20 @@ var Chart = (function() {
     for (var i = 0; i < this._lines.length; i++) {
       var column = this._lines[i];
       var type = column.type;
+      var color = rgbToString(this._rgbColors[type]);
+
       items +=
         '<li class="charts-selector__item hide-selection"><label class="checkbox" style="color: ' +
-        rgbToString(this._rgbColors[type]) +
-        '"><div class="checkbox__wrapper"><input type="checkbox" class="checkbox__input ' +
+        color +
+        "; border-color: " +
+        color +
+        '"><input type="checkbox" class="checkbox__input ' +
         HIDDEN_CLASS +
         '" name="' +
         type +
-        '" checked>' +
+        '" checked><div class="checkbox__wrapper" style="background-color:' +
+        color +
+        '">' +
         CheckedIcon +
         '<span class="checkbox__title">' +
         data.names[type] +
@@ -1244,7 +1250,7 @@ var Chart = (function() {
     container.appendChild(this._checkboxContainer);
   };
 
-  Chart.prototype._onChangeCheckbox = function _onChangeCheckbox(event) {
+  Chart.prototype._onChangeCheckbox = function(event) {
     var target = event.target;
     var extremums = this._localExtremums;
     this._floatMouseLeave();
@@ -1264,7 +1270,7 @@ var Chart = (function() {
     this._animationLoop();
   };
 
-  Chart.prototype._pushAnimation = function _pushAnimation(animation) {
+  Chart.prototype._pushAnimation = function(animation) {
     if (!this._animations[animation.tag]) {
       this._activeAnimations++;
     }
@@ -1272,7 +1278,7 @@ var Chart = (function() {
     this._animations[animation.tag] = animation.hook;
   };
 
-  Chart.prototype._findYDeltas = function _findYDeltas() {
+  Chart.prototype._findYDeltas = function() {
     var glob = this._globalExtremums;
     var local = this._localExtremums;
     var deltas = {};
@@ -1295,7 +1301,7 @@ var Chart = (function() {
     return deltas;
   };
 
-  Chart.prototype._animateVertical = function _animateVertical(deltas) {
+  Chart.prototype._animateVertical = function(deltas) {
     var _this3 = this;
 
     var tag = "_animateVertical";
@@ -1344,10 +1350,7 @@ var Chart = (function() {
     };
   };
 
-  Chart.prototype._animateHorisontal = function _animateHorisontal(
-    oldVal,
-    newVal
-  ) {
+  Chart.prototype._animateHorisontal = function(oldVal, newVal) {
     var _this4 = this;
 
     var tag = "_animateHorisontal";
@@ -1373,7 +1376,7 @@ var Chart = (function() {
     };
   };
 
-  Chart.prototype._animateHideChart = function _animateHideChart(type, value) {
+  Chart.prototype._animateHideChart = function(type, value) {
     var _this5 = this;
     var tag = "_animateHideChart";
 
@@ -1392,7 +1395,7 @@ var Chart = (function() {
     };
   };
 
-  Chart.prototype._animateDates = function _animateDates(hide) {
+  Chart.prototype._animateDates = function(hide) {
     var _this6 = this;
 
     var tag = "_animateHideChart";
@@ -1416,7 +1419,7 @@ var Chart = (function() {
     };
   };
 
-  Chart.prototype._animateYAxis = function _animateYAxis(toDown) {
+  Chart.prototype._animateYAxis = function(toDown) {
     var _this7 = this;
     var tag = "_animateYAxis";
     var yAxis = this._transitions.yAxis;
@@ -1454,7 +1457,7 @@ var Chart = (function() {
     };
   };
 
-  Chart.prototype._animationLoop = function _animationLoop() {
+  Chart.prototype._animationLoop = function() {
     this._cleanUp();
 
     if (this._activeAnimations || this._state.drag.active) {
@@ -1473,12 +1476,12 @@ var Chart = (function() {
   return Chart;
 })();
 
-var onFetchData = function onFetchData(data) {
+function onFetchData(data) {
   var fragment = document.createDocumentFragment();
   var w = document.documentElement.clientWidth * 0.8;
   var h = 350;
 
-  w = w > 300 ? 300 : w;
+  w = w > 350 ? 350 : w;
 
   for (var i = 0; i < data.length; i++) {
     var chartContainer = document.createElement("div");
@@ -1492,17 +1495,17 @@ var onFetchData = function onFetchData(data) {
 
   appElement.querySelector(".app__charts").appendChild(fragment);
   _$TelegramCharts.modeSwitcherData.element.className = "button mode-switcher";
-};
+}
 
-var fetchData = function fetchData() {
+function fetchData() {
   return fetch(DATA_ENDPOINT)
     .then(function(data) {
       return data.json();
     })
     .catch(console.log);
-};
+}
 
-var switchMode = function switchMode() {
+function switchMode() {
   var data = _$TelegramCharts.modeSwitcherData;
   var modes = _$TelegramCharts.modes;
   var isNight = data.mode === modes.Night;
@@ -1514,14 +1517,14 @@ var switchMode = function switchMode() {
   for (var i = 0; i < data.updateHooks.length; i++) {
     data.updateHooks[i]();
   }
-};
+}
 
-var bootUp = function bootUp() {
+function bootUp() {
   var switcherData = _$TelegramCharts.modeSwitcherData;
   appElement = document.querySelector(".app");
   fetchData().then(onFetchData);
   switcherData.element = appElement.querySelector(".mode-switcher");
   switcherData.element.addEventListener("click", switchMode, listenerOpts);
-};
+}
 
 document.addEventListener("DOMContentLoaded", bootUp);

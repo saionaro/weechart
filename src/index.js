@@ -1,8 +1,6 @@
 "use strict";
 
 var _this = void 0;
-
-var DATA_ENDPOINT = "./chart_data.json";
 var HIDDEN_CLASS = "visually-hidden";
 var DATA_TYPE_LINE = "line";
 var ACTIVE_ARROW_CLASS = "chart__minimap-dragger-arrow--active";
@@ -98,14 +96,20 @@ var _$TelegramCharts = {
   }
 };
 
-var canvasTypesEnum = {
+var canvasTypes = {
   Minimap: "minimap",
   MinimapBackground: "minimap-background",
   Chart: "chart",
   Float: "float"
 };
 
-var chartTypesList = [canvasTypesEnum.Minimap, canvasTypesEnum.Chart];
+var chartedCanvasTypesList = [canvasTypes.Minimap, canvasTypes.Chart];
+
+var ChartTypes = {
+  Line: "line",
+  Bar: "bar",
+  Area: "area"
+};
 
 var colors = {
   ChartSeparator: {
@@ -343,6 +347,7 @@ var Chart = (function() {
     this._data = data;
     this._lines = [];
     this._dates = null;
+    this._chartType = null;
     var dotsCount = data.columns[0].length - 1;
 
     if (dotsCount > 400) {
@@ -358,22 +363,18 @@ var Chart = (function() {
     this._forceRenderDates = true;
     this._datesCleaned = false;
     this._activeAnimations = 0;
-    this._chart = createCanvasObject(canvasTypesEnum.Chart, w, h);
+    this._chart = createCanvasObject(canvasTypes.Chart, w, h);
     this._chart.height -= DATE_MARGIN;
     this._yAxisAnimationShift = (this._chart.height / LINES_COUNT) * 3;
     this._chart.canvas.className = "chart__chart-canvas hide-selection";
     this._chart.context = this._chart.canvas.getContext("2d");
-    this._float = createCanvasObject(canvasTypesEnum.Float, w, h);
+    this._float = createCanvasObject(canvasTypes.Float, w, h);
     this._float.height -= DATE_MARGIN;
     this._float.canvas.className = "chart__float-canvas hide-selection";
     this._float.context = this._float.canvas.getContext("2d");
-    this._minimap = createCanvasObject(
-      canvasTypesEnum.Minimap,
-      w,
-      MINIMAP_HEIGHT
-    );
+    this._minimap = createCanvasObject(canvasTypes.Minimap, w, MINIMAP_HEIGHT);
     this._minimapBackground = createCanvasObject(
-      canvasTypesEnum.MinimapBackground,
+      canvasTypes.MinimapBackground,
       w,
       MINIMAP_HEIGHT
     );
@@ -410,12 +411,12 @@ var Chart = (function() {
       xShift: 0
     };
 
-    this._transitions[canvasTypesEnum.Minimap] = {
+    this._transitions[canvasTypes.Minimap] = {
       yRatioModifer: 0,
       xRatioModifer: 1
     };
 
-    this._transitions[canvasTypesEnum.Chart] = {
+    this._transitions[canvasTypes.Chart] = {
       yRatioModifer: 0,
       xRatioModifer: startScale
     };
@@ -424,7 +425,7 @@ var Chart = (function() {
       var column = data.columns[j];
       var type = column[0];
 
-      if (this._data.types[type] === DATA_TYPE_LINE) {
+      if (this._data.types[type] !== "x") {
         this._rgbColors[type] = hexToRgb(this._data.colors[type]);
         this._transitions.chartsOpacity[type] = 1;
 
@@ -438,6 +439,10 @@ var Chart = (function() {
           type: column[0],
           data: _data
         });
+
+        this._chartType = this._chartType
+          ? this._chartType
+          : this._data.types[type];
 
         this._visibleCount++;
       } else {
@@ -854,7 +859,7 @@ var Chart = (function() {
   };
 
   Chart.prototype._changeDragWidth = function(delta) {
-    var record = this._transitions[canvasTypesEnum.Chart];
+    var record = this._transitions[canvasTypes.Chart];
     var drag = this._state.drag;
     var changedWidth = drag.width + delta;
     var deltaRatio = drag.width / changedWidth;
@@ -926,7 +931,7 @@ var Chart = (function() {
 
     return (
       opacityInProcess ||
-      !!this._transitions[canvasTypesEnum.Minimap].yRatioModifer ||
+      !!this._transitions[canvasTypes.Minimap].yRatioModifer ||
       this._minimapCleaned
     );
   };
@@ -1135,7 +1140,7 @@ var Chart = (function() {
     store.window[0] = 0;
     store.window[1] = count;
 
-    if (type === canvasTypesEnum.Chart) {
+    if (type === canvasTypes.Chart) {
       var start = Math.round(-store.shift / store.scale) - 1;
       var end = Math.round((data.width - store.shift) / store.scale) + 2;
       store.window[0] = start < 0 ? 0 : start;
@@ -1145,7 +1150,7 @@ var Chart = (function() {
 
   Chart.prototype._getYParams = function(data) {
     var usedExtremums =
-      data.type === canvasTypesEnum.Chart
+      data.type === canvasTypes.Chart
         ? this._localExtremums
         : this._globalExtremums;
     return (
@@ -1186,7 +1191,7 @@ var Chart = (function() {
   Chart.prototype._renderChart = function(params, data) {
     var context = params.context;
     var chartsOpacity = this._transitions.chartsOpacity;
-    var isChart = params.type === canvasTypesEnum.Chart;
+    var isChart = params.type === canvasTypes.Chart;
     var yScale = this._getYParams(params);
 
     for (var j = 0; j < this._lines.length; j++) {
@@ -1197,11 +1202,17 @@ var Chart = (function() {
       if (opacity !== 0) {
         context.beginPath();
         context.strokeStyle = rgbToString(this._rgbColors[type], opacity);
+        context.fillStyle = rgbToString(this._rgbColors[type], opacity);
 
         for (var i = data.window[0]; i < data.window[1]; i++) {
           var x = i * data.scale + (isChart ? data.shift : 0);
           var y = params.height - column.data[i] * yScale;
-          context.lineTo(x, y);
+
+          if (this._chartType === ChartTypes.Bar) {
+            context.fillRect(x - data.scale, y, data.scale, params.height - y);
+          } else {
+            context.lineTo(x, y);
+          }
         }
 
         context.stroke();
@@ -1283,14 +1294,10 @@ var Chart = (function() {
     var local = this._localExtremums;
     var deltas = {};
 
-    for (
-      var i = 0, _chartTypesList = chartTypesList;
-      i < _chartTypesList.length;
-      i++
-    ) {
-      var canvasType = _chartTypesList[i];
+    for (var i = 0; i < chartedCanvasTypesList.length; i++) {
+      var canvasType = chartedCanvasTypesList[i];
       var height = this["_" + canvasType].height;
-      var isChart = canvasType === canvasTypesEnum.Chart;
+      var isChart = canvasType === canvasTypes.Chart;
       var extrOld = isChart ? local.prev : glob.prev;
       var extrNew = isChart ? local.current : glob.current;
       deltas[canvasType] =
@@ -1307,12 +1314,8 @@ var Chart = (function() {
     var tag = "_animateVertical";
     var steps = {};
 
-    for (
-      var i = 0, _chartTypesList2 = chartTypesList;
-      i < _chartTypesList2.length;
-      i++
-    ) {
-      var canvasType = _chartTypesList2[i];
+    for (var i = 0; i < chartedCanvasTypesList.length; i++) {
+      var canvasType = chartedCanvasTypesList[i];
       steps[canvasType] = deltas[canvasType] / ANIMATION_STEPS;
       this._transitions[canvasType].yRatioModifer = -deltas[canvasType];
     }
@@ -1321,12 +1324,8 @@ var Chart = (function() {
       hook: function hook() {
         var finishedAnimations = 0;
 
-        for (
-          var i = 0, _chartTypesList3 = chartTypesList;
-          i < _chartTypesList3.length;
-          i++
-        ) {
-          var canvasType = _chartTypesList3[i];
+        for (var i = 0; i < chartedCanvasTypesList.length; i++) {
+          var canvasType = chartedCanvasTypesList[i];
           var record = _this3._transitions[canvasType];
           var yModifer = record.yRatioModifer;
 
@@ -1341,7 +1340,7 @@ var Chart = (function() {
           }
         }
 
-        if (finishedAnimations === chartTypesList.length) {
+        if (finishedAnimations === chartedCanvasTypesList.length) {
           delete _this3._animations[tag];
           _this3._activeAnimations--;
         }
@@ -1355,7 +1354,7 @@ var Chart = (function() {
 
     var tag = "_animateHorisontal";
     var step = (newVal - oldVal) / ANIMATION_STEPS;
-    var record = this._transitions[canvasTypesEnum.Chart];
+    var record = this._transitions[canvasTypes.Chart];
     record.xRatioModifer = newVal;
 
     return {
@@ -1481,7 +1480,7 @@ function onFetchData(data) {
   var w = document.documentElement.clientWidth * 0.8;
   var h = 350;
 
-  w = w > 350 ? 350 : w;
+  w = w > 400 ? 400 : w;
 
   for (var i = 0; i < data.length; i++) {
     var chartContainer = document.createElement("div");
@@ -1497,8 +1496,8 @@ function onFetchData(data) {
   _$TelegramCharts.modeSwitcherData.element.className = "button mode-switcher";
 }
 
-function fetchData() {
-  return fetch(DATA_ENDPOINT)
+function fetchData(url) {
+  return fetch(url)
     .then(function(data) {
       return data.json();
     })
@@ -1522,7 +1521,14 @@ function switchMode() {
 function bootUp() {
   var switcherData = _$TelegramCharts.modeSwitcherData;
   appElement = document.querySelector(".app");
-  fetchData().then(onFetchData);
+  var urls = [];
+
+  for (var i = 1; i <= 5; i++) {
+    urls.push("./data2/" + i + "/overview.json");
+  }
+
+  Promise.all(urls.map(fetchData)).then(onFetchData);
+
   switcherData.element = appElement.querySelector(".mode-switcher");
   switcherData.element.addEventListener("click", switchMode, listenerOpts);
 }

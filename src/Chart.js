@@ -124,7 +124,7 @@ function createDragger(width) {
 }
 
 function getLabelClass(title) {
-  return "floating-window__" + title.replace(/ +/g, "_");
+  return `floating-window__${title.replace(/ +/g, "_")}`;
 }
 
 function createFloatingWindow(data, colors) {
@@ -247,7 +247,7 @@ export class Chart {
         this._rgbColors[type] = hexToRgb(this._data.colors[type]);
         this._transitions.chartsOpacity[type] = 1;
 
-        const data = column.slice(1);
+        let data = column.slice(1);
 
         if (this._overflow) {
           data = data.slice(-this._dataCount);

@@ -1,8 +1,13 @@
 {
   "scripts": {
-    "build": "rollup src/index.js --format cjs --file build/bundle.js"
+    "build": "rollup src/index.js --format cjs --file build/bundle.js",
+    "lint": "eslint --ext .js src"
   },
   "devDependencies": {
+    "@arkweid/lefthook": "^0.6.3",
+    "eslint": "^6.3.0",
+    "eslint-config-prettier": "^6.2.0",
+    "prettier": "^1.18.2",
     "rollup": "^1.20.3"
   }
 }

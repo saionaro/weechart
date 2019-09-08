@@ -1,0 +1,5 @@
+src
+.eslintrc.json
+.gitignore
+.travis.yml
+lefthook.yml

@@ -1,8 +1,21 @@
 {
+  "name": "nanochart",
+  "version": "0.0.1",
+  "description": "Small and simple linechart library",
   "scripts": {
     "build": "rollup src/index.js --format cjs --file build/bundle.js",
-    "lint": "eslint --ext .js src"
+    "lint": "eslint --ext .js src",
+    "publish:patch": "npm version patch && git push --follow-tags && npm publish"
   },
+  "author": "Saionaro <shibakow@gmail.com>",
+  "keywords": [
+    "chart",
+    "linechart",
+    "nano",
+    "minimalistic",
+    "fast"
+  ],
+  "license": "MIT",
   "devDependencies": {
     "@arkweid/lefthook": "^0.6.3",
     "eslint": "^6.3.0",

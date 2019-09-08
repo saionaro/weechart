@@ -304,6 +304,7 @@ export class Chart {
     const floatingWindow = this._state.floatingWindow;
     const drag = this._state.drag;
     const dragger = drag.dragger;
+
     drag.leftElem = dragger.querySelector(
       ".chart__minimap-dragger-arrow--left"
     );

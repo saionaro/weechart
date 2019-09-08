@@ -1,22 +1,19 @@
-"use strict";
+const HIDDEN_CLASS = "visually-hidden";
+const DATA_TYPE_LINE = "line";
+const ACTIVE_ARROW_CLASS = "chart__minimap-dragger-arrow--active";
+const LINES_COUNT = 6;
+const SCALE_RATE = 1;
+const MINIMAP_HEIGHT = 50;
+const MINIMAL_DRAG_WIDTH = 40;
+const ANIMATION_STEPS = 16;
+const DATES_PLACE = 65;
+const DATE_MARGIN = 32;
+const HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
 
-var _this = void 0;
-var HIDDEN_CLASS = "visually-hidden";
-var DATA_TYPE_LINE = "line";
-var ACTIVE_ARROW_CLASS = "chart__minimap-dragger-arrow--active";
-var LINES_COUNT = 6;
-var SCALE_RATE = 1;
-var MINIMAP_HEIGHT = 50;
-var MINIMAL_DRAG_WIDTH = 40;
-var ANIMATION_STEPS = 16;
-var DATES_PLACE = 65;
-var DATE_MARGIN = 32;
-var HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
-
-var PIXEL_RATIO = (function() {
-  var ctx = document.createElement("canvas").getContext("2d");
-  var dpr = devicePixelRatio || 1;
-  var bsr =
+const PIXEL_RATIO = (function() {
+  const ctx = document.createElement("canvas").getContext("2d");
+  const dpr = devicePixelRatio || 1;
+  const bsr =
     ctx.webkitBackingStorePixelRatio ||
     ctx.mozBackingStorePixelRatio ||
     ctx.msBackingStorePixelRatio ||
@@ -26,13 +23,13 @@ var PIXEL_RATIO = (function() {
   return dpr / bsr;
 })();
 
-var shortcuts = {
+const shortcuts = {
   months: "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" "),
   weekdays: "Sun Mon Tue Wed Thu Fri Sat".split(" ")
 };
-var appElement;
-var listenerOpts = { passive: true };
-var _$TelegramCharts = {
+let appElement;
+const listenerOpts = { passive: true };
+const _$TelegramCharts = {
   modes: {
     Night: "night",
     Day: "day"
@@ -51,23 +48,23 @@ var _$TelegramCharts = {
   mouseupConsumers: [],
   touchmoveConsumers: [],
   onMouseUp: function(event) {
-    var mouseupConsumers = _$TelegramCharts.mouseupConsumers;
+    const mouseupConsumers = _$TelegramCharts.mouseupConsumers;
 
-    for (var i = 0; i < mouseupConsumers.length; i++) {
+    for (let i = 0; i < mouseupConsumers.length; i++) {
       mouseupConsumers[i](event);
     }
   },
   onTouchMove: function(event) {
-    var touchmoveConsumers = _$TelegramCharts.touchmoveConsumers;
+    const touchmoveConsumers = _$TelegramCharts.touchmoveConsumers;
 
-    for (var i = 0; i < touchmoveConsumers.length; i++) {
+    for (let i = 0; i < touchmoveConsumers.length; i++) {
       touchmoveConsumers[i](event);
     }
   },
   onMouseMove: function(event) {
-    var mousemoveConsumers = _$TelegramCharts.mousemoveConsumers;
+    const mousemoveConsumers = _$TelegramCharts.mousemoveConsumers;
 
-    for (var i = 0; i < mousemoveConsumers.length; i++) {
+    for (let i = 0; i < mousemoveConsumers.length; i++) {
       mousemoveConsumers[i](event);
     }
   },
@@ -96,22 +93,22 @@ var _$TelegramCharts = {
   }
 };
 
-var canvasTypes = {
+const canvasTypes = {
   Minimap: "minimap",
   MinimapBackground: "minimap-background",
   Chart: "chart",
   Float: "float"
 };
 
-var chartedCanvasTypesList = [canvasTypes.Minimap, canvasTypes.Chart];
+const chartedCanvasTypesList = [canvasTypes.Minimap, canvasTypes.Chart];
 
-var ChartTypes = {
+const ChartTypes = {
   Line: "line",
   Bar: "bar",
   Area: "area"
 };
 
-var colors = {
+const colors = {
   ChartSeparator: {
     day: {
       r: 235,
@@ -150,11 +147,14 @@ var colors = {
   }
 };
 
-var CheckedIcon =
-  '<svg class="checked-icon" height="20" width="20" viewBox="0 0 40 40"> <polyline class="checked-icon__done" points="12,21 18,27 30,14" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" stroke="white" fill="none" /> </svg>';
+const CheckedIcon = `
+  <svg class="checked-icon" height="20" width="20" viewBox="0 0 40 40">
+    <polyline class="checked-icon__done" points="12,21 18,27 30,14" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" stroke="white" fill="none" />
+  </svg>
+`;
 
 function hexToRgb(hex) {
-  var result = HEX_REGEX.exec(hex);
+  const result = HEX_REGEX.exec(hex);
   if (!result) return null;
 
   return {
@@ -169,14 +169,14 @@ function rgbToString(rgb, alpha) {
     alpha = 1;
   }
 
-  return "rgba(" + rgb.r + ", " + rgb.g + ", " + rgb.b + ", " + alpha + ")";
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
 }
 
 function calculateVerticalRatio(maxValue, height) {
   if (maxValue > height) {
     return height / maxValue;
   } else {
-    var scaledHeight = SCALE_RATE * height;
+    const scaledHeight = SCALE_RATE * height;
 
     if (maxValue < scaledHeight) {
       return scaledHeight / maxValue;
@@ -189,16 +189,16 @@ function getCursorXPosition(canvas, event) {
 }
 
 function setTransform(style, value) {
-  style.transform = "translateX(" + value + "px)";
+  style.transform = `translateX(${value}px)`;
 }
 
 function createHiDPICanvas(w, h) {
-  var canvas = document.createElement("canvas");
+  const canvas = document.createElement("canvas");
   canvas.width = w * PIXEL_RATIO;
   canvas.height = h * PIXEL_RATIO;
   canvas.style.width = w + "px";
   canvas.style.height = h + "px";
-  var context = canvas.getContext("2d");
+  const context = canvas.getContext("2d");
   context.lineJoin = "round";
   context.setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
   context.font = "lighter 13px Helvetica, Arial";
@@ -206,22 +206,23 @@ function createHiDPICanvas(w, h) {
 }
 
 function fuzzyAdd(sum, number) {
-  var result = sum + number;
+  const result = sum + number;
   if (sum > 0) return result < 0 ? 0 : result;
   return result > 0 ? 0 : result;
 }
 
 function throttle(func, ms) {
-  var isThrottled = false;
-  var savedArgs = null;
+  let isThrottled = false;
+  let savedArgs = null;
 
-  return function wrapper() {
-    var args = arguments;
+  return function wrapper(...args) {
     if (isThrottled) {
       savedArgs = args;
       return;
     }
-    func.apply(_this, args);
+
+    func(...args);
+
     isThrottled = true;
 
     setTimeout(function() {
@@ -235,11 +236,11 @@ function throttle(func, ms) {
   };
 }
 
-var cachedDates = {};
+const cachedDates = {};
 
 function toDateString(timestamp) {
   if (!cachedDates[timestamp]) {
-    var date = new Date(timestamp);
+    const date = new Date(timestamp);
     cachedDates[timestamp] =
       shortcuts.months[date.getMonth()] + " " + date.getDate();
   }
@@ -248,22 +249,20 @@ function toDateString(timestamp) {
 }
 
 function short(number) {
-  var res = number;
-
   if (number > 1000000) {
     return (number / 1000000).toFixed(1) + "M";
   }
   if (number > 1000) {
     return (number / 1000).toFixed(1) + "K";
   }
-  return res;
+  return number;
 }
 
-var cachedWeekdays = {};
+const cachedWeekdays = {};
 
 function toWeekday(timestamp) {
   if (!cachedWeekdays[timestamp]) {
-    var date = new Date(timestamp);
+    const date = new Date(timestamp);
     cachedWeekdays[timestamp] = "" + shortcuts.weekdays[date.getDay()];
   }
 
@@ -281,9 +280,9 @@ function createCanvasObject(type, width, height) {
 }
 
 function createDragger(width) {
-  var dragger = document.createElement("div");
-  var arrowLeft = document.createElement("div");
-  var arrowRight = document.createElement("div");
+  const dragger = document.createElement("div");
+  const arrowLeft = document.createElement("div");
+  const arrowRight = document.createElement("div");
   dragger.className = "chart__minimap-dragger hide-selection";
   dragger.style.height = MINIMAP_HEIGHT + "px";
   dragger.style.width = width + "px";
@@ -301,25 +300,29 @@ function getLabelClass(title) {
 }
 
 function createFloatingWindow(data, colors) {
-  var sections = "";
+  let sections = "";
 
-  for (var type in data.names) {
-    sections +=
-      '<li class="floating-window__section" style="color: ' +
-      rgbToString(colors[type]) +
-      '"><span class="floating-window__count ' +
-      getLabelClass(type) +
-      '"></span><span class="floating-window__label">' +
-      data.names[type] +
-      "</span></li>";
+  for (const type in data.names) {
+    sections += `
+      <li class="floating-window__section" style="color: ${rgbToString(
+        colors[type]
+      )}">
+        <span class="floating-window__count ${getLabelClass(type)}"></span>
+        <span class="floating-window__label">${data.names[type]}</span>
+      </li>`;
   }
 
-  var floatingWindow = document.createElement("div");
-  floatingWindow.className = "floating-window " + HIDDEN_CLASS;
+  const floatingWindow = document.createElement("div");
+  floatingWindow.className = `floating-window ${HIDDEN_CLASS}`;
   floatingWindow.innerHTML =
     '<p class="floating-window__date"></p><ul class="floating-window__sections">' +
     sections +
     "</ul>";
+
+  floatingWindow.innerHTML = `
+    <p class="floating-window__date"></p>
+    <ul class="floating-window__sections">${sections}</ul>`;
+
   return floatingWindow;
 }
 
@@ -340,15 +343,15 @@ function createExtremumStore() {
   };
 }
 
-var Chart = (function() {
-  function Chart(container, data, params) {
-    var w = params.w;
-    var h = params.h;
+class Chart {
+  constructor(container, data, params) {
+    const w = params.w;
+    const h = params.h;
     this._data = data;
     this._lines = [];
     this._dates = null;
     this._chartType = null;
-    var dotsCount = data.columns[0].length - 1;
+    const dotsCount = data.columns[0].length - 1;
 
     if (dotsCount > 400) {
       this._overflow = true;
@@ -387,15 +390,15 @@ var Chart = (function() {
     this._minimap.context = this._minimap.canvas.getContext("2d");
     this._rgbColors = {};
     this._animations = [];
-    var pixelsForDot = w / this._dataCount;
-    var startScale = 1;
+    const pixelsForDot = w / this._dataCount;
+    let startScale = 1;
 
     if (pixelsForDot < 35) {
       startScale = 35 / pixelsForDot;
 
-      var _dragWidth = w / startScale;
+      const dragWidth = w / startScale;
 
-      if (_dragWidth < MINIMAL_DRAG_WIDTH) {
+      if (dragWidth < MINIMAL_DRAG_WIDTH) {
         startScale = w / MINIMAL_DRAG_WIDTH;
       }
     }
@@ -421,24 +424,21 @@ var Chart = (function() {
       xRatioModifer: startScale
     };
 
-    for (var j = 0; j < data.columns.length; j++) {
-      var column = data.columns[j];
-      var type = column[0];
+    for (let j = 0; j < data.columns.length; j++) {
+      const column = data.columns[j];
+      const type = column[0];
 
       if (this._data.types[type] !== "x") {
         this._rgbColors[type] = hexToRgb(this._data.colors[type]);
         this._transitions.chartsOpacity[type] = 1;
 
-        var _data = column.slice(1);
+        const data = column.slice(1);
 
         if (this._overflow) {
-          _data = _data.slice(-this._dataCount);
+          data = data.slice(-this._dataCount);
         }
 
-        this._lines.push({
-          type: type,
-          data: _data
-        });
+        this._lines.push({ type, data });
 
         this._chartType = this._chartType
           ? this._chartType
@@ -446,7 +446,7 @@ var Chart = (function() {
 
         this._visibleCount++;
       } else {
-        var dates = column.slice(1);
+        let dates = column.slice(1);
 
         if (this._overflow) {
           dates = dates.slice(-this._dataCount);
@@ -458,8 +458,8 @@ var Chart = (function() {
 
     this._container = container;
     this._checkboxContainer = null;
-    var dragWidth = w / startScale;
-    var viewShift = w - dragWidth;
+    const dragWidth = w / startScale;
+    const viewShift = w - dragWidth;
     this._state = {
       exclude: {},
       floatingWindow: {
@@ -484,11 +484,11 @@ var Chart = (function() {
         }
       }
     };
-    var fragment = document.createDocumentFragment();
-    var wrapper = document.createElement("div");
-    var floatingWindow = this._state.floatingWindow;
-    var drag = this._state.drag;
-    var dragger = drag.dragger;
+    const fragment = document.createDocumentFragment();
+    const wrapper = document.createElement("div");
+    const floatingWindow = this._state.floatingWindow;
+    const drag = this._state.drag;
+    const dragger = drag.dragger;
     drag.leftElem = dragger.querySelector(
       ".chart__minimap-dragger-arrow--left"
     );
@@ -500,18 +500,18 @@ var Chart = (function() {
       ".floating-window__date"
     );
 
-    for (var j = 0; j < this._lines.length; j++) {
+    for (let j = 0; j < this._lines.length; j++) {
       floatingWindow.labels[
         this._lines[j].type
       ] = floatingWindow.elem.querySelector(
-        "." + getLabelClass(this._lines[j].type)
+        `.${getLabelClass(this._lines[j].type)}`
       );
     }
 
     setTransform(dragger.style, viewShift);
     this._transitions.xShift = viewShift / this._minimap.width;
     wrapper.className = "chart__minimap-wrapper";
-    wrapper.style.width = w + "px";
+    wrapper.style.width = `${w}px`;
     wrapper.appendChild(this._minimap.canvas);
     wrapper.appendChild(this._minimapBackground.canvas);
     wrapper.appendChild(dragger);
@@ -522,7 +522,7 @@ var Chart = (function() {
 
     this._container.appendChild(fragment);
 
-    this._container.style.width = w + "px";
+    this._container.style.width = `${w}px`;
     this._onChangeCheckbox = this._onChangeCheckbox.bind(this);
     this._animationLoop = this._animationLoop.bind(this);
     this._startDrag = this._startDrag.bind(this);
@@ -587,7 +587,7 @@ var Chart = (function() {
     this._storeXParams(this._minimapXParams, this._minimap);
     this._storeXParams(this._chartXParams, this._chart);
 
-    var hiddenDates = this._getHiddenDates(this._dataCount, w);
+    const hiddenDates = this._getHiddenDates(this._dataCount, w);
 
     this._hiddenDates = {
       prev: hiddenDates,
@@ -600,30 +600,28 @@ var Chart = (function() {
     this._renderButtons();
   }
 
-  Chart.prototype._floatMoveTouchAdapter = function(event) {
-    var touch = event.changedTouches[0];
+  _floatMoveTouchAdapter(event) {
+    this._floatMouseMove(event.changedTouches[0]);
+  }
 
-    this._floatMouseMove(touch);
-  };
-
-  Chart.prototype._floatMouseMove = function(event) {
-    var active = this._state.drag.active;
+  _floatMouseMove(event) {
+    const active = this._state.drag.active;
     if (active || !this._visibleCount) return;
 
-    var scale = this._chartXParams.scale;
-    var shift = this._chartXParams.shift;
-    var cursorX = getCursorXPosition(this._float.canvas, event);
-    var selected = Math.round((cursorX - shift) / scale);
+    const scale = this._chartXParams.scale;
+    const shift = this._chartXParams.shift;
+    const cursorX = getCursorXPosition(this._float.canvas, event);
+    const selected = Math.round((cursorX - shift) / scale);
 
     this._drawFloatingLine(selected, selected * scale + shift);
-  };
+  }
 
-  Chart.prototype._drawFloatingLine = function(index, x) {
-    var canvas = this._float.canvas;
-    var context = this._float.context;
-    var height = this._float.height;
-    var width = this._float.width;
-    var chartsOpacity = this._transitions.chartsOpacity;
+  _drawFloatingLine(index, x) {
+    const canvas = this._float.canvas;
+    const context = this._float.context;
+    const height = this._float.height;
+    const width = this._float.width;
+    const chartsOpacity = this._transitions.chartsOpacity;
 
     this._clear(canvas);
 
@@ -634,20 +632,20 @@ var Chart = (function() {
     context.lineTo(x, height);
     context.stroke();
 
-    var yScale = this._getYParams(this._chart);
+    const yScale = this._getYParams(this._chart);
 
-    var data = {
+    const data = {
       date: 0,
       x: x,
       toLeft: width / 2 < x,
       values: {}
     };
 
-    for (var i = 0; i < this._lines.length; i++) {
-      var column = this._lines[i];
+    for (let i = 0; i < this._lines.length; i++) {
+      const column = this._lines[i];
 
       if (chartsOpacity[column.type]) {
-        var y = height - column.data[index] * yScale;
+        const y = height - column.data[index] * yScale;
         data.date = this._dates[index];
         data.values[column.type] = column.data[index];
         context.strokeStyle = rgbToString(this._rgbColors[column.type], 1);
@@ -661,24 +659,24 @@ var Chart = (function() {
     }
 
     this._updateFloatingWindow(data);
-  };
+  }
 
-  Chart.prototype._updateFloatingWindow = function(params) {
-    var x = params.x;
-    var date = params.date;
-    var toLeft = params.toLeft;
-    var values = params.values;
-    var elem = this._state.floatingWindow.elem;
-    var dateElem = this._state.floatingWindow.dateElem;
-    var labels = this._state.floatingWindow.labels;
+  _updateFloatingWindow(params) {
+    const x = params.x;
+    const date = params.date;
+    const toLeft = params.toLeft;
+    const values = params.values;
+    const elem = this._state.floatingWindow.elem;
+    const dateElem = this._state.floatingWindow.dateElem;
+    const labels = this._state.floatingWindow.labels;
     elem.classList.remove(HIDDEN_CLASS);
     dateElem.innerHTML = toWeekday(date) + ", " + toDateString(date);
 
-    for (var type in values) {
+    for (const type in values) {
       labels[type].innerHTML = short(values[type]);
     }
 
-    var shift;
+    let shift;
 
     if (toLeft) {
       shift = x - elem.offsetWidth - 15;
@@ -687,49 +685,46 @@ var Chart = (function() {
     }
 
     setTransform(elem.style, shift);
-  };
+  }
 
-  Chart.prototype._hideFloatingWindowLabel = function(type, hide) {
-    var labels = this._state.floatingWindow.labels;
+  _hideFloatingWindowLabel(type, hide) {
+    let labels = this._state.floatingWindow.labels;
     labels[type].parentNode.classList.toggle(
       "floating-window__section--hidden",
       hide
     );
-  };
+  }
 
-  Chart.prototype._floatMouseLeave = function _floatMouseLeave() {
-    var _this2 = this;
-
-    setTimeout(function() {
-      _this2._clear(_this2._float.canvas);
-
-      _this2._state.floatingWindow.elem.classList.add(HIDDEN_CLASS);
+  _floatMouseLeave() {
+    setTimeout(() => {
+      this._clear(this._float.canvas);
+      this._state.floatingWindow.elem.classList.add(HIDDEN_CLASS);
     }, 100);
-  };
+  }
 
-  Chart.prototype._findAllExtremums = function() {
-    var window = this._chartXParams.window;
+  _findAllExtremums() {
+    const window = this._chartXParams.window;
 
     this._findExtremums(this._localExtremums, window);
     this._findExtremums(this._globalExtremums);
-  };
+  }
 
-  Chart.prototype._findExtremums = function(store, range) {
-    var max = -Infinity;
-    var min = Infinity;
-    var from = 1;
-    var to = this._dataCount;
+  _findExtremums(store, range) {
+    let max = -Infinity;
+    let min = Infinity;
+    let from = 1;
+    let to = this._dataCount;
 
     if (range) {
       from = range[0] + 1;
       to = range[1] + 1;
     }
 
-    for (var j = 0; j < this._lines.length; j++) {
-      var column = this._lines[j];
+    for (let j = 0; j < this._lines.length; j++) {
+      const column = this._lines[j];
 
       if (!this._state.exclude[column.type]) {
-        for (var i = from; i < to; i++) {
+        for (let i = from; i < to; i++) {
           if (column.data[i] > max) {
             max = column.data[i];
           }
@@ -751,23 +746,23 @@ var Chart = (function() {
     store.prev.max = store.current.max;
     store.current.min = min;
     store.current.max = max;
-  };
+  }
 
-  Chart.prototype._startDragTouchAdapter = function(event) {
+  _startDragTouchAdapter(event) {
     this._floatMouseLeave();
 
     this._startDrag({
       which: 1,
       target: event.target
     });
-  };
+  }
 
-  Chart.prototype._startDrag = function(event) {
+  _startDrag(event) {
     if (event.which !== 1 || !event.target) return;
 
-    var drag = this._state.drag;
-    var classList = event.target.classList;
-    var className = "chart__minimap-dragger--dragging";
+    const drag = this._state.drag;
+    const classList = event.target.classList;
+    let className = "chart__minimap-dragger--dragging";
 
     if (classList.contains("chart__minimap-dragger-arrow")) {
       className = "chart__minimap-dragger--resizing";
@@ -785,14 +780,14 @@ var Chart = (function() {
     drag.active = true;
 
     this._animationLoop();
-  };
+  }
 
-  Chart.prototype._moveDragTouchAdapter = function(event) {
-    var touch = event.changedTouches[0];
-    var drag = this._state.drag;
-    var savedX = drag.savedTouchX;
-    var currentX = touch.clientX;
-    var speed = 0;
+  _moveDragTouchAdapter(event) {
+    const touch = event.changedTouches[0];
+    const drag = this._state.drag;
+    const savedX = drag.savedTouchX;
+    const currentX = touch.clientX;
+    let speed = 0;
 
     if (savedX) {
       speed = currentX - savedX;
@@ -802,11 +797,11 @@ var Chart = (function() {
     drag.touchEventAdapterData.movementX = speed;
 
     this._moveDrag(drag.touchEventAdapterData);
-  };
+  }
 
-  Chart.prototype._moveDrag = function(event) {
-    var movementX = event.movementX;
-    var drag = this._state.drag;
+  _moveDrag(event) {
+    const movementX = event.movementX;
+    const drag = this._state.drag;
 
     if (!drag.active || !movementX) return;
 
@@ -816,19 +811,20 @@ var Chart = (function() {
       return this._handleResize(movementX);
     }
 
-    var maxPadding = this._minimap.width - drag.width;
-    var sum = drag.marginLeft + movementX;
-    var val = sum < 0 ? 0 : sum > maxPadding ? maxPadding : sum;
+    const maxPadding = this._minimap.width - drag.width;
+    const sum = drag.marginLeft + movementX;
+    const val = sum < 0 ? 0 : sum > maxPadding ? maxPadding : sum;
+
     setTransform(drag.dragger.style, val);
     drag.marginLeft = val;
     this._transitions.xShift = val / this._minimap.width;
 
     this._storeXParams(this._chartXParams, this._chart);
     this._checkYScaleChange();
-  };
+  }
 
-  Chart.prototype._handleResize = function(delta) {
-    var drag = this._state.drag;
+  _handleResize(delta) {
+    const drag = this._state.drag;
 
     if (drag.leftArrow) {
       if (
@@ -838,15 +834,17 @@ var Chart = (function() {
         return;
       }
 
-      var newVal = drag.marginLeft + delta;
-      var newShift = newVal / this._minimap.width;
+      const newVal = drag.marginLeft + delta;
+      const newShift = newVal / this._minimap.width;
+
       drag.marginLeft = newVal;
       setTransform(drag.dragger.style, newVal);
       this._transitions.xShift = newShift;
+
       return this._changeDragWidth(-delta);
     }
 
-    var maxPadding = this._minimap.width - drag.width;
+    const maxPadding = this._minimap.width - drag.width;
 
     if (
       drag.width + delta < MINIMAL_DRAG_WIDTH ||
@@ -856,13 +854,14 @@ var Chart = (function() {
     }
 
     this._changeDragWidth(delta);
-  };
+  }
 
-  Chart.prototype._changeDragWidth = function(delta) {
-    var record = this._transitions[canvasTypes.Chart];
-    var drag = this._state.drag;
-    var changedWidth = drag.width + delta;
-    var deltaRatio = drag.width / changedWidth;
+  _changeDragWidth(delta) {
+    const record = this._transitions[canvasTypes.Chart];
+    const drag = this._state.drag;
+    const changedWidth = drag.width + delta;
+    const deltaRatio = drag.width / changedWidth;
+
     drag.width = changedWidth;
     drag.dragger.style.width = changedWidth + "px";
 
@@ -876,11 +875,14 @@ var Chart = (function() {
     this._storeXParams(this._chartXParams, this._chart);
     this._checkYScaleChange();
     this._checkHiddenDatesChange();
-  };
+  }
 
-  Chart.prototype._checkHiddenDatesChange = function() {
-    var dates = this._hiddenDates;
-    var hiddenDates = this._getHiddenDates(this._dataCount, this._chart.width);
+  _checkHiddenDatesChange() {
+    const dates = this._hiddenDates;
+    const hiddenDates = this._getHiddenDates(
+      this._dataCount,
+      this._chart.width
+    );
 
     if (hiddenDates._$count !== dates.current._$count) {
       dates.prev = dates.current;
@@ -890,11 +892,11 @@ var Chart = (function() {
         this._animateDates(dates.prev._$count < dates.current._$count)
       );
     }
-  };
+  }
 
-  Chart.prototype._checkYScaleChange = function() {
-    var extrPrev = this._localExtremums.prev;
-    var extrCurr = this._localExtremums.current;
+  _checkYScaleChange() {
+    const extrPrev = this._localExtremums.prev;
+    const extrCurr = this._localExtremums.current;
 
     this._findAllExtremums();
 
@@ -902,10 +904,11 @@ var Chart = (function() {
       this._pushAnimation(this._animateVertical(this._findYDeltas()));
       this._pushAnimation(this._animateYAxis(extrPrev.max < extrCurr.max));
     }
-  };
+  }
 
-  Chart.prototype._endDrag = function() {
-    var drag = this._state.drag;
+  _endDrag() {
+    const drag = this._state.drag;
+
     drag.active = false;
     drag.leftArrow = false;
     drag.resize = false;
@@ -914,14 +917,14 @@ var Chart = (function() {
     drag.dragger.classList.remove("chart__minimap-dragger--dragging");
     drag.leftElem.classList.remove(ACTIVE_ARROW_CLASS);
     drag.rightElem.classList.remove(ACTIVE_ARROW_CLASS);
-  };
+  }
 
-  Chart.prototype._shouldRenderMinimap = function() {
-    var opacityInProcess = false;
+  _shouldRenderMinimap() {
+    let opacityInProcess = false;
 
-    for (var i = 0; i < this._lines.length; i++) {
-      var column = this._lines[i];
-      var val = this._transitions.chartsOpacity[column.type];
+    for (let i = 0; i < this._lines.length; i++) {
+      const column = this._lines[i];
+      const val = this._transitions.chartsOpacity[column.type];
 
       if (val > 0 && val < 1) {
         opacityInProcess = true;
@@ -934,78 +937,81 @@ var Chart = (function() {
       !!this._transitions[canvasTypes.Minimap].yRatioModifer ||
       this._minimapCleaned
     );
-  };
+  }
 
-  Chart.prototype._shouldRenderDates = function() {
+  _shouldRenderDates() {
     if (this._transitions.datesOpacity !== 1) {
       return true;
     }
 
     return this._forceRenderDates || this._datesCleaned;
-  };
+  }
 
-  Chart.prototype._cleanUp = function() {
+  _cleanUp() {
     this._clearChart();
 
     if (this._shouldRenderMinimap()) {
       this._clear(this._minimap.canvas);
       this._minimapCleaned = true;
     }
+
     if (this._shouldRenderDates()) {
       this._clearDates();
       this._datesCleaned = true;
     }
     this._clear(this._minimapBackground.canvas);
-  };
+  }
 
-  Chart.prototype._clearChart = function() {
+  _clearChart() {
     this._chart.context.clearRect(0, 0, this._chart.width, this._chart.height);
-  };
+  }
 
-  Chart.prototype._clearDates = function() {
+  _clearDates() {
     this._chart.context.clearRect(
       0,
       this._chart.height,
       this._chart.width,
       this._chart.height + DATE_MARGIN
     );
-  };
+  }
 
-  Chart.prototype._clear = function(canvas) {
-    var context = canvas.getContext("2d");
-    context.clearRect(0, 0, canvas.width, canvas.height);
-  };
+  _clear(canvas) {
+    canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+  }
 
-  Chart.prototype._render = function() {
+  _render() {
     this._drawChart();
 
     if (this._shouldRenderMinimap()) {
       this._drawMinimap();
       this._minimapCleaned = false;
     }
+
     if (this._shouldRenderDates()) {
       this._renderDates();
       this._datesCleaned = false;
       this._forceRenderDates = false;
     }
-    this._drawMinimapBackground();
-  };
 
-  Chart.prototype._drawChart = function() {
+    this._drawMinimapBackground();
+  }
+
+  _drawChart() {
     this._chart.context.lineWidth = 1;
     this._renderLines(this._chart);
     this._chart.context.lineWidth = 2.5;
     this._renderChart(this._chart, this._chartXParams);
     this._renderYValues();
-  };
+  }
 
-  Chart.prototype._drawMinimap = function() {
+  _drawMinimap() {
     this._renderChart(this._minimap, this._minimapXParams);
-  };
+  }
 
-  Chart.prototype._drawMinimapBackground = function() {
-    var context = this._minimapBackground.context;
-    var drag = this._state.drag;
+  _drawMinimapBackground() {
+    const context = this._minimapBackground.context;
+    const drag = this._state.drag;
+
     context.fillStyle = getColor("MinimapBackground");
     context.fillRect(0, 0, drag.marginLeft + 8, this._minimapBackground.height);
     context.fillRect(
@@ -1014,23 +1020,23 @@ var Chart = (function() {
       this._minimapBackground.width,
       this._minimapBackground.height
     );
-  };
+  }
 
-  Chart.prototype._renderLines = function(chart) {
-    var context = chart.context;
-    var width = chart.width;
-    var height = chart.height;
-    var current = this._localExtremums.current;
-    var yAxis = this._transitions.yAxis;
-    var stepSize = height / LINES_COUNT;
-    var color = getColor("ChartSeparator");
+  _renderLines(chart) {
+    const context = chart.context;
+    const width = chart.width;
+    const height = chart.height;
+    const current = this._localExtremums.current;
+    const yAxis = this._transitions.yAxis;
+    const stepSize = height / LINES_COUNT;
+    const color = getColor("ChartSeparator");
 
     context.beginPath();
 
     if (current.max !== -Infinity) {
-      for (var i = 1; i < LINES_COUNT; i++) {
-        var shift = height - i * stepSize;
-        var y = shift + yAxis.shift;
+      for (let i = 1; i < LINES_COUNT; i++) {
+        const shift = height - i * stepSize;
+        const y = shift + yAxis.shift;
 
         if (y <= height) {
           context.strokeStyle = rgbToString(color, yAxis.opacity);
@@ -1040,7 +1046,8 @@ var Chart = (function() {
 
         if (yAxis.opacity < 1) {
           context.strokeStyle = rgbToString(color, 1 - yAxis.opacity);
-          var yCoord = y + this._yAxisAnimationShift * (yAxis.toDown ? 1 : -1);
+          const yCoord =
+            y + this._yAxisAnimationShift * (yAxis.toDown ? 1 : -1);
 
           if (yCoord < height) {
             context.moveTo(0, yCoord);
@@ -1055,24 +1062,24 @@ var Chart = (function() {
     }
 
     context.stroke();
-  };
+  }
 
-  Chart.prototype._renderDates = function() {
-    var context = this._chart.context;
-    var height = this._chart.height;
-    var scale = this._chartXParams.scale;
-    var shift = this._chartXParams.shift;
-    var window = this._chartXParams.window;
-    var hiddenDates = this._hiddenDates;
-    var datesOpacity = this._transitions.datesOpacity;
+  _renderDates() {
+    const context = this._chart.context;
+    const height = this._chart.height;
+    const scale = this._chartXParams.scale;
+    const shift = this._chartXParams.shift;
+    const window = this._chartXParams.window;
+    const hiddenDates = this._hiddenDates;
+    const datesOpacity = this._transitions.datesOpacity;
 
-    for (var i = window[0]; i < window[1]; i++) {
-      var x = i * scale + shift;
-      var isLast = i === this._dataCount - 1;
-      var hide = hiddenDates.current[i] && !hiddenDates.prev[i];
-      var show = !hiddenDates.current[i] && hiddenDates.prev[i];
-      var isTransition = show || hide;
-      var opacity = 1;
+    for (let i = window[0]; i < window[1]; i++) {
+      const x = i * scale + shift;
+      const isLast = i === this._dataCount - 1;
+      const hide = hiddenDates.current[i] && !hiddenDates.prev[i];
+      const show = !hiddenDates.current[i] && hiddenDates.prev[i];
+      const isTransition = show || hide;
+      let opacity = 1;
       context.textAlign = isLast ? "right" : "center";
       context.lineWidth = 1;
 
@@ -1085,27 +1092,27 @@ var Chart = (function() {
         context.fillText(toDateString(this._dates[i]), x, height + 18);
       }
     }
-  };
+  }
 
-  Chart.prototype._renderYValues = function() {
-    var context = this._chart.context;
-    var height = this._chart.height;
-    var current = this._localExtremums.current;
-    var prev = this._localExtremums.prev;
-    var yAxis = this._transitions.yAxis;
-    var stepSize = height / LINES_COUNT;
-    var color = getColor("ChartText");
-    var maxHeight = height - 6;
+  _renderYValues() {
+    const context = this._chart.context;
+    const height = this._chart.height;
+    const current = this._localExtremums.current;
+    const prev = this._localExtremums.prev;
+    const yAxis = this._transitions.yAxis;
+    const stepSize = height / LINES_COUNT;
+    const color = getColor("ChartText");
+    const maxHeight = height - 6;
 
     context.lineWidth = 1;
 
     if (current.max !== -Infinity) {
       context.textAlign = "left";
 
-      for (var i = 1; i < LINES_COUNT; i++) {
-        var yShift = maxHeight - i * stepSize;
-        var y = yShift + yAxis.shift;
-        var part = i / LINES_COUNT;
+      for (let i = 1; i < LINES_COUNT; i++) {
+        const yShift = maxHeight - i * stepSize;
+        const y = yShift + yAxis.shift;
+        const part = i / LINES_COUNT;
 
         if (y < maxHeight) {
           context.fillStyle = rgbToString(color, yAxis.opacity);
@@ -1113,7 +1120,8 @@ var Chart = (function() {
         }
 
         if (yAxis.opacity < 1) {
-          var yCoord = y + this._yAxisAnimationShift * (yAxis.toDown ? 1 : -1);
+          const yCoord =
+            y + this._yAxisAnimationShift * (yAxis.toDown ? 1 : -1);
 
           if (yCoord < maxHeight) {
             context.fillStyle = rgbToString(color, 1 - yAxis.opacity);
@@ -1125,15 +1133,15 @@ var Chart = (function() {
       context.fillStyle = rgbToString(color, 1);
       context.fillText(0, 0, maxHeight);
     }
-  };
+  }
 
-  Chart.prototype._storeXParams = function(store, data) {
-    var type = data.type;
-    var xShift = this._transitions.xShift;
-    var record = this._transitions[type];
-    var count = this._dataCount;
-    var countM1 = count - 1;
-    var scale = (data.width / countM1) * record.xRatioModifer;
+  _storeXParams(store, data) {
+    const type = data.type;
+    const xShift = this._transitions.xShift;
+    const record = this._transitions[type];
+    const count = this._dataCount;
+    const countM1 = count - 1;
+    const scale = (data.width / countM1) * record.xRatioModifer;
 
     store.scale = scale;
     store.shift = -(countM1 * scale * xShift);
@@ -1141,15 +1149,15 @@ var Chart = (function() {
     store.window[1] = count;
 
     if (type === canvasTypes.Chart) {
-      var start = Math.round(-store.shift / store.scale) - 1;
-      var end = Math.round((data.width - store.shift) / store.scale) + 2;
+      const start = Math.round(-store.shift / store.scale) - 1;
+      const end = Math.round((data.width - store.shift) / store.scale) + 2;
       store.window[0] = start < 0 ? 0 : start;
       store.window[1] = end > count ? count : end;
     }
-  };
+  }
 
-  Chart.prototype._getYParams = function(data) {
-    var usedExtremums =
+  _getYParams(data) {
+    const usedExtremums =
       data.type === canvasTypes.Chart
         ? this._localExtremums
         : this._globalExtremums;
@@ -1157,26 +1165,26 @@ var Chart = (function() {
       calculateVerticalRatio(usedExtremums.current.max, data.height) +
       this._transitions[data.type].yRatioModifer
     );
-  };
+  }
 
-  Chart.prototype._getHiddenDates = function(total, width) {
-    var window = this._chartXParams.window;
-    var toHide = {};
-    var count = window[1] - window[0];
-    var iter = 1;
-    var hiddenCount = 0;
+  _getHiddenDates(total, width) {
+    const window = this._chartXParams.window;
+    const toHide = {};
+    let count = window[1] - window[0];
+    let iter = 1;
+    let hiddenCount = 0;
 
     while (count * DATES_PLACE > width) {
-      for (var i = total - 1 - iter; i >= 0; i -= 2 * iter) {
+      for (let i = total - 1 - iter; i >= 0; i -= 2 * iter) {
         if (!toHide[i]) {
           hiddenCount++;
         }
         toHide[i] = true;
       }
 
-      var localCount = 0;
+      let localCount = 0;
 
-      for (var i = window[0]; i < window[1]; i++) {
+      for (let i = window[0]; i < window[1]; i++) {
         localCount += toHide[i] ? 0 : 1;
       }
 
@@ -1185,28 +1193,29 @@ var Chart = (function() {
     }
 
     toHide._$count = hiddenCount;
+
     return toHide;
-  };
+  }
 
-  Chart.prototype._renderChart = function(params, data) {
-    var context = params.context;
-    var chartsOpacity = this._transitions.chartsOpacity;
-    var isChart = params.type === canvasTypes.Chart;
-    var yScale = this._getYParams(params);
+  _renderChart(params, data) {
+    const context = params.context;
+    const chartsOpacity = this._transitions.chartsOpacity;
+    const isChart = params.type === canvasTypes.Chart;
+    const yScale = this._getYParams(params);
 
-    for (var j = 0; j < this._lines.length; j++) {
-      var column = this._lines[j];
-      var type = column.type;
-      var opacity = chartsOpacity[type];
+    for (let j = 0; j < this._lines.length; j++) {
+      const column = this._lines[j];
+      const type = column.type;
+      const opacity = chartsOpacity[type];
 
       if (opacity !== 0) {
         context.beginPath();
         context.strokeStyle = rgbToString(this._rgbColors[type], opacity);
         context.fillStyle = rgbToString(this._rgbColors[type], opacity);
 
-        for (var i = data.window[0]; i < data.window[1]; i++) {
-          var x = i * data.scale + (isChart ? data.shift : 0);
-          var y = params.height - column.data[i] * yScale;
+        for (let i = data.window[0]; i < data.window[1]; i++) {
+          const x = i * data.scale + (isChart ? data.shift : 0);
+          const y = params.height - column.data[i] * yScale;
 
           if (this._chartType === ChartTypes.Bar) {
             context.fillRect(x - data.scale, y, data.scale, params.height - y);
@@ -1218,38 +1227,34 @@ var Chart = (function() {
         context.stroke();
       }
     }
-  };
+  }
 
-  Chart.prototype._renderButtons = function() {
-    var items = "";
-    var data = this._data;
-    var container = this._container;
+  _renderButtons() {
+    let items = "";
+    const data = this._data;
+    const container = this._container;
 
-    for (var i = 0; i < this._lines.length; i++) {
-      var column = this._lines[i];
-      var type = column.type;
-      var color = rgbToString(this._rgbColors[type]);
+    for (let i = 0; i < this._lines.length; i++) {
+      const column = this._lines[i];
+      const type = column.type;
+      const color = rgbToString(this._rgbColors[type]);
 
-      items +=
-        '<li class="charts-selector__item hide-selection"><label class="checkbox" style="color: ' +
-        color +
-        "; border-color: " +
-        color +
-        '"><input type="checkbox" class="checkbox__input ' +
-        HIDDEN_CLASS +
-        '" name="' +
-        type +
-        '" checked><div class="checkbox__wrapper" style="background-color:' +
-        color +
-        '">' +
-        CheckedIcon +
-        '<span class="checkbox__title">' +
-        data.names[type] +
-        "</span></div></label></li>";
+      items += `
+        <li class="charts-selector__item hide-selection">
+          <label class="checkbox" style="color: ${color}; border-color: ${color};">
+            <input type="checkbox" class="checkbox__input ${HIDDEN_CLASS}" name="${type}" checked>
+            <div class="checkbox__wrapper" style="background-color: ${color};">
+              ${CheckedIcon}
+              <span class="checkbox__title">
+                ${data.names[type]}
+              </span>
+            </div>
+          </label>
+        </li>`;
     }
 
-    var tempContainer = document.createElement("div");
-    tempContainer.innerHTML = '<ul class="charts-selector">' + items + "</ul>";
+    const tempContainer = document.createElement("div");
+    tempContainer.innerHTML = `<ul class="charts-selector">${items}</ul>`;
     this._checkboxContainer = tempContainer.children[0];
 
     this._checkboxContainer.addEventListener(
@@ -1259,11 +1264,12 @@ var Chart = (function() {
     );
 
     container.appendChild(this._checkboxContainer);
-  };
+  }
 
-  Chart.prototype._onChangeCheckbox = function(event) {
-    var target = event.target;
-    var extremums = this._localExtremums;
+  _onChangeCheckbox(event) {
+    const target = event.target;
+    const extremums = this._localExtremums;
+
     this._floatMouseLeave();
     this._pushAnimation(this._animateHideChart(target.name, target.checked));
     this._state.exclude[target.name] = !target.checked;
@@ -1279,55 +1285,54 @@ var Chart = (function() {
     }
 
     this._animationLoop();
-  };
+  }
 
-  Chart.prototype._pushAnimation = function(animation) {
+  _pushAnimation(animation) {
     if (!this._animations[animation.tag]) {
       this._activeAnimations++;
     }
 
     this._animations[animation.tag] = animation.hook;
-  };
+  }
 
-  Chart.prototype._findYDeltas = function() {
-    var glob = this._globalExtremums;
-    var local = this._localExtremums;
-    var deltas = {};
+  _findYDeltas() {
+    const glob = this._globalExtremums;
+    const local = this._localExtremums;
+    const deltas = {};
 
-    for (var i = 0; i < chartedCanvasTypesList.length; i++) {
-      var canvasType = chartedCanvasTypesList[i];
-      var height = this["_" + canvasType].height;
-      var isChart = canvasType === canvasTypes.Chart;
-      var extrOld = isChart ? local.prev : glob.prev;
-      var extrNew = isChart ? local.current : glob.current;
+    for (let i = 0; i < chartedCanvasTypesList.length; i++) {
+      const canvasType = chartedCanvasTypesList[i];
+      const height = this["_" + canvasType].height;
+      const isChart = canvasType === canvasTypes.Chart;
+      const extrOld = isChart ? local.prev : glob.prev;
+      const extrNew = isChart ? local.current : glob.current;
+
       deltas[canvasType] =
         calculateVerticalRatio(extrNew.max, height) -
         calculateVerticalRatio(extrOld.max, height);
     }
 
     return deltas;
-  };
+  }
 
-  Chart.prototype._animateVertical = function(deltas) {
-    var _this3 = this;
+  _animateVertical(deltas) {
+    const tag = "_animateVertical";
+    const steps = {};
 
-    var tag = "_animateVertical";
-    var steps = {};
-
-    for (var i = 0; i < chartedCanvasTypesList.length; i++) {
-      var canvasType = chartedCanvasTypesList[i];
+    for (let i = 0; i < chartedCanvasTypesList.length; i++) {
+      const canvasType = chartedCanvasTypesList[i];
       steps[canvasType] = deltas[canvasType] / ANIMATION_STEPS;
       this._transitions[canvasType].yRatioModifer = -deltas[canvasType];
     }
 
     return {
-      hook: function hook() {
-        var finishedAnimations = 0;
+      hook: () => {
+        let finishedAnimations = 0;
 
-        for (var i = 0; i < chartedCanvasTypesList.length; i++) {
-          var canvasType = chartedCanvasTypesList[i];
-          var record = _this3._transitions[canvasType];
-          var yModifer = record.yRatioModifer;
+        for (let i = 0; i < chartedCanvasTypesList.length; i++) {
+          const canvasType = chartedCanvasTypesList[i];
+          const record = this._transitions[canvasType];
+          const yModifer = record.yRatioModifer;
 
           if (
             (yModifer >= 0 && deltas[canvasType] > 0) ||
@@ -1341,24 +1346,23 @@ var Chart = (function() {
         }
 
         if (finishedAnimations === chartedCanvasTypesList.length) {
-          delete _this3._animations[tag];
-          _this3._activeAnimations--;
+          delete this._animations[tag];
+          this._activeAnimations--;
         }
       },
-      tag: tag
+      tag
     };
-  };
+  }
 
-  Chart.prototype._animateHorisontal = function(oldVal, newVal) {
-    var _this4 = this;
+  _animateHorisontal(oldVal, newVal) {
+    const tag = "_animateHorisontal";
+    const step = (newVal - oldVal) / ANIMATION_STEPS;
+    const record = this._transitions[canvasTypes.Chart];
 
-    var tag = "_animateHorisontal";
-    var step = (newVal - oldVal) / ANIMATION_STEPS;
-    var record = this._transitions[canvasTypes.Chart];
     record.xRatioModifer = newVal;
 
     return {
-      hook: function hook() {
+      hook: () => {
         record.xRatioModifer += step;
 
         if (
@@ -1367,42 +1371,39 @@ var Chart = (function() {
           step === 0
         ) {
           record.xRatioModifer = newVal;
-          delete _this4._animations[tag];
-          _this4._activeAnimations--;
+          delete this._animations[tag];
+          this._activeAnimations--;
         }
       },
-      tag: tag
+      tag
     };
-  };
+  }
 
-  Chart.prototype._animateHideChart = function(type, value) {
-    var _this5 = this;
-    var tag = "_animateHideChart";
+  _animateHideChart(type, value) {
+    const tag = "_animateHideChart";
 
     return {
-      hook: function hook() {
-        var record = _this5._transitions.chartsOpacity;
+      hook: () => {
+        const record = this._transitions.chartsOpacity;
         record[type] += value ? 0.08 : -0.08;
 
         if ((record[type] <= 0 && !value) || (record[type] >= 1 && value)) {
           record[type] = value ? 1 : 0;
-          delete _this5._animations[tag];
-          _this5._activeAnimations--;
+          delete this._animations[tag];
+          this._activeAnimations--;
         }
       },
-      tag: tag
+      tag
     };
-  };
+  }
 
-  Chart.prototype._animateDates = function(hide) {
-    var _this6 = this;
-
-    var tag = "_animateHideChart";
-    var record = this._transitions;
+  _animateDates(hide) {
+    const tag = "_animateHideChart";
+    const record = this._transitions;
     record.datesOpacity = hide ? 1 : 0;
 
     return {
-      hook: function hook() {
+      hook: () => {
         record.datesOpacity += hide ? -0.06 : 0.06;
 
         if (
@@ -1410,24 +1411,24 @@ var Chart = (function() {
           (record.datesOpacity >= 1 && !hide)
         ) {
           record.datesOpacity = hide ? 0 : 1;
-          delete _this6._animations[tag];
-          _this6._activeAnimations--;
+          delete this._animations[tag];
+          this._activeAnimations--;
         }
       },
-      tag: tag
+      tag
     };
-  };
+  }
 
-  Chart.prototype._animateYAxis = function(toDown) {
-    var _this7 = this;
-    var tag = "_animateYAxis";
-    var yAxis = this._transitions.yAxis;
+  _animateYAxis(toDown) {
+    const tag = "_animateYAxis";
+    const yAxis = this._transitions.yAxis;
+
     yAxis.toDown = toDown;
     yAxis.opacity = 0;
     yAxis.shift = this._yAxisAnimationShift * (toDown ? -1 : 1);
 
     return {
-      hook: function hook() {
+      hook: () => {
         if (yAxis.opacity < 1) {
           yAxis.opacity += 0.05;
         }
@@ -1448,19 +1449,19 @@ var Chart = (function() {
         ) {
           yAxis.opacity = 1;
           yAxis.shift = 0;
-          delete _this7._animations[tag];
-          _this7._activeAnimations--;
+          delete this._animations[tag];
+          this._activeAnimations--;
         }
       },
-      tag: tag
+      tag
     };
-  };
+  }
 
-  Chart.prototype._animationLoop = function() {
+  _animationLoop() {
     this._cleanUp();
 
     if (this._activeAnimations || this._state.drag.active) {
-      for (var key in this._animations) {
+      for (const key in this._animations) {
         this._animations[key]();
       }
 
@@ -1470,25 +1471,20 @@ var Chart = (function() {
     } else {
       this._render();
     }
-  };
-
-  return Chart;
-})();
+  }
+}
 
 function onFetchData(data) {
-  var fragment = document.createDocumentFragment();
-  var w = document.documentElement.clientWidth * 0.8;
-  var h = 350;
+  const fragment = document.createDocumentFragment();
+  const h = 350;
+  let w = document.documentElement.clientWidth * 0.8;
 
   w = w > 400 ? 400 : w;
 
-  for (var i = 0; i < data.length; i++) {
-    var chartContainer = document.createElement("div");
+  for (let i = 0; i < data.length; i++) {
+    const chartContainer = document.createElement("div");
     chartContainer.className = "chart";
-    new Chart(chartContainer, data[i], {
-      w: w,
-      h: h
-    });
+    new Chart(chartContainer, data[i], { w, h });
     fragment.appendChild(chartContainer);
   }
 
@@ -1498,33 +1494,33 @@ function onFetchData(data) {
 
 function fetchData(url) {
   return fetch(url)
-    .then(function(data) {
-      return data.json();
-    })
+    .then(data => data.json())
     .catch(console.log);
 }
 
 function switchMode() {
-  var data = _$TelegramCharts.modeSwitcherData;
-  var modes = _$TelegramCharts.modes;
-  var isNight = data.mode === modes.Night;
-  var newMode = isNight ? modes.Day : modes.Night;
+  const data = _$TelegramCharts.modeSwitcherData;
+  const modes = _$TelegramCharts.modes;
+  const isNight = data.mode === modes.Night;
+  const newMode = isNight ? modes.Day : modes.Night;
+
   data.mode = newMode;
   data.element.innerHTML = data.captions[newMode];
   appElement.classList = isNight ? "app" : "app app--night";
 
-  for (var i = 0; i < data.updateHooks.length; i++) {
+  for (let i = 0; i < data.updateHooks.length; i++) {
     data.updateHooks[i]();
   }
 }
 
 function bootUp() {
-  var switcherData = _$TelegramCharts.modeSwitcherData;
-  appElement = document.querySelector(".app");
-  var urls = [];
+  const switcherData = _$TelegramCharts.modeSwitcherData;
+  const urls = [];
 
-  for (var i = 1; i <= 5; i++) {
-    urls.push("./data2/" + i + "/overview.json");
+  appElement = document.querySelector(".app");
+
+  for (let i = 1; i <= 5; i++) {
+    urls.push(`./data/${i}/overview.json`);
   }
 
   Promise.all(urls.map(fetchData)).then(onFetchData);

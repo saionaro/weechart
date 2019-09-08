@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "build": "rollup src/index.js --format cjs --file build/bundle.js"
+  },
+  "devDependencies": {
+    "rollup": "^1.20.3"
+  }
+}

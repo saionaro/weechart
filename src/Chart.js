@@ -27,6 +27,8 @@ import {
   createExtremumStore
 } from "./utils";
 
+import "./styles/style.css";
+
 const appElement = document.querySelector(".app");
 
 const _$TelegramCharts = {

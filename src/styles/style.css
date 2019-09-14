@@ -13,9 +13,6 @@ body {
 }
 
 .hide-selection {
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -214,9 +211,7 @@ body {
   box-shadow: 0 0 1px #bbbbbb;
   color: #222222;
   background-color: #ffffff;
-  transition-property: -webkit-transform;
   transition-property: transform;
-  transition-property: transform, -webkit-transform;
   transition-duration: 0.3s;
 }
 

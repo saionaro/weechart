@@ -7,6 +7,7 @@
     "build": "rollup --config",
     "start": "rollup -w --config",
     "lint": "eslint --ext .js src",
+    "prepublishOnly": "yarn build",
     "publish:patch": "npm version patch && git push --follow-tags && npm publish"
   },
   "main": "dist/bundle.js",

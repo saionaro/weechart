@@ -1,5 +1,5 @@
 {
-  "name": "nanochart",
+  "name": "weechart",
   "version": "0.0.1",
   "description": "Small and simple linechart library",
   "scripts": {

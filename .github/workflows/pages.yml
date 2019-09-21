@@ -13,5 +13,5 @@ jobs:
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           BASE_BRANCH: master
           BRANCH: gh-pages
-          FOLDER: stand/dist
+          FOLDER: dist
           BUILD_SCRIPT: cd stand && yarn install && yarn build

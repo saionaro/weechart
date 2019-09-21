@@ -3,12 +3,13 @@
   "version": "0.0.1",
   "description": "Small and simple linechart library",
   "scripts": {
+    "size": "size-limit",
     "build": "rollup --config",
     "start": "rollup -w --config",
     "lint": "eslint --ext .js src",
     "publish:patch": "npm version patch && git push --follow-tags && npm publish"
   },
-  "main": "./build/bundle.js",
+  "main": "dist/bundle.js",
   "author": "Saionaro <shibakow@gmail.com>",
   "keywords": [
     "chart",
@@ -17,11 +18,18 @@
     "minimalistic",
     "fast"
   ],
+  "size-limit": [
+    {
+      "path": "src/Chart.js",
+      "limit": "10 KB"
+    }
+  ],
   "license": "MIT",
   "devDependencies": {
     "@arkweid/lefthook": "^0.6.3",
     "@babel/core": "^7.6.0",
     "@babel/preset-env": "^7.6.0",
+    "@size-limit/preset-small-lib": "^2.1.6",
     "autoprefixer": "^9.6.1",
     "browser-sync": "^2.26.7",
     "cssnano": "^4.1.10",

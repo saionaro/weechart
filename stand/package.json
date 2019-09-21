@@ -4,7 +4,7 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "build": "parcel build src/index.html",
+    "build": "parcel build --public-url weechart src/index.html",
     "start": "parcel src/index.html"
   },
   "devDependencies": {

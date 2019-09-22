@@ -1,13 +1,3 @@
-html {
-  width: 100%;
-  height: 100%;
-}
-
-body {
-  padding: 0;
-  margin: 0;
-}
-
 .visually-hidden {
   display: none;
 }
@@ -18,6 +8,7 @@ body {
 }
 
 .button {
+  font-family: Helvetica, Arial, sans-serif;
   border: none;
   margin: 0;
   padding: 0;
@@ -27,28 +18,12 @@ body {
   cursor: pointer;
 }
 
-.app {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 10vh 0;
-  background-color: #ffffff;
-  transition-property: background-color;
-  transition-duration: 0.5s;
-  font-family: Helvetica, Arial, sans-serif;
-}
-
-.app__charts {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-around;
-}
-
 .mode-switcher {
   margin-top: 64px;
 }
 
 .chart {
+  font-family: Helvetica, Arial, sans-serif;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -59,9 +34,6 @@ body {
   display: flex;
   margin-top: 16px;
   position: relative;
-}
-
-.chart__chart-canvas {
 }
 
 .chart__float-canvas {
@@ -251,36 +223,4 @@ body {
 
 .floating-window__label {
   font-size: 14px;
-}
-
-.app.app--night {
-  background-color: #222f3f;
-}
-
-.app--night .checkbox {
-  border-color: #304659;
-}
-
-.app--night .checkbox__title {
-  color: #e7ecee;
-}
-
-.app--night .chart__minimap-dragger {
-  border-color: #56626d;
-  box-shadow: none;
-}
-
-.app--night .chart__minimap-dragger-arrow {
-  background-color: #56626d;
-  border-color: transparent;
-}
-
-.app--night .floating-window {
-  color: #ffffff;
-  box-shadow: 0 0 1px rgba(0, 0, 0, 0.3);
-  background-color: #233242;
-}
-
-.app--night .checkbox__input:not(:checked) + .checkbox__wrapper {
-  background-color: #233242 !important;
 }

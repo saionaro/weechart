@@ -1,6 +1,7 @@
-# WeeСhart [![Build Status](https://travis-ci.com/Saionaro/telegram-contest-2019.svg?branch=master)](https://travis-ci.com/Saionaro/telegram-contest-2019)
+# WeeСhart [![Build Status](https://travis-ci.com/Saionaro/weechart.svg?branch=master)](https://travis-ci.com/Saionaro/weechart)
 
 ## Installation
+
 For NPM users:
 
 `npm i weechart`

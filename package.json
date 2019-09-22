@@ -3,7 +3,7 @@
   "version": "0.0.3",
   "description": "Small and simple linechart library",
   "scripts": {
-    "size": "size-limit",
+    "size": "yarn build && size-limit",
     "build": "rollup --config",
     "start": "rollup -w --config",
     "lint": "eslint --ext .js src",
@@ -28,8 +28,9 @@
   ],
   "size-limit": [
     {
-      "path": "src/Chart.js",
-      "limit": "10 KB"
+      "path": "dist/*",
+      "limit": "10 KB",
+      "webpack": false
     }
   ],
   "license": "MIT",

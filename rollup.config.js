@@ -12,7 +12,9 @@ module.exports = {
   },
   plugins: [
     terser({
-      mangle: true
+      mangle: {
+        toplevel: true
+      }
     }),
     postcss({
       extract: true,

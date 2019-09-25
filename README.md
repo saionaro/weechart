@@ -1,4 +1,4 @@
-# WeeСhart [![Build Status](https://travis-ci.com/Saionaro/weechart.svg?branch=master)](https://travis-ci.com/Saionaro/weechart)
+# WeeСhart [![Build Status](https://travis-ci.com/Saionaro/weechart.svg?branch=master)](https://travis-ci.com/Saionaro/weechart)[![npm version](https://badge.fury.io/js/weechart.svg)](https://badge.fury.io/js/weechart)
 
 ## Installation
 

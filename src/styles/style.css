@@ -224,3 +224,31 @@
 .floating-window__label {
   font-size: 14px;
 }
+
+.chart--night .checkbox {
+  border-color: #304659;
+}
+
+.chart--night .checkbox__title {
+  color: #e7ecee;
+}
+
+.chart--night .chart__minimap-dragger {
+  border-color: #56626d;
+  box-shadow: none;
+}
+
+.chart--night .chart__minimap-dragger-arrow {
+  background-color: #56626d;
+  border-color: transparent;
+}
+
+.chart--night .floating-window {
+  color: #ffffff;
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.3);
+  background-color: #233242;
+}
+
+.chart--night .checkbox__input:not(:checked) + .checkbox__wrapper {
+  background-color: #233242 !important;
+}

@@ -16,6 +16,7 @@ import {
   LISTENER_OPTIONS
 } from "./constants";
 import { hexToRgb, rgbToString } from "./colors";
+import { WeeChart } from "./commonData";
 import {
   createHiDPICanvas,
   throttle,
@@ -28,72 +29,6 @@ import {
 } from "./utils";
 
 import "./styles/style.css";
-
-const appElement = document.querySelector(".app");
-
-const _$TelegramCharts = {
-  modes: {
-    Night: "night",
-    Day: "day"
-  },
-  modeSwitcherData: {
-    element: null,
-    updateHooks: [],
-    captions: {
-      night: "Switch to Day Mode",
-      day: "Switch to Night Mode"
-    },
-    mode: "day"
-  },
-  listenersActivated: false,
-  mousemoveConsumers: [],
-  mouseupConsumers: [],
-  touchmoveConsumers: [],
-  onMouseUp: function(event) {
-    const mouseupConsumers = _$TelegramCharts.mouseupConsumers;
-
-    for (let i = 0; i < mouseupConsumers.length; i++) {
-      mouseupConsumers[i](event);
-    }
-  },
-  onTouchMove: function(event) {
-    const touchmoveConsumers = _$TelegramCharts.touchmoveConsumers;
-
-    for (let i = 0; i < touchmoveConsumers.length; i++) {
-      touchmoveConsumers[i](event);
-    }
-  },
-  onMouseMove: function(event) {
-    const mousemoveConsumers = _$TelegramCharts.mousemoveConsumers;
-
-    for (let i = 0; i < mousemoveConsumers.length; i++) {
-      mousemoveConsumers[i](event);
-    }
-  },
-  activateDragEvents: function() {
-    document.addEventListener(
-      "mousemove",
-      _$TelegramCharts.onMouseMove,
-      LISTENER_OPTIONS
-    );
-    document.addEventListener(
-      "mouseup",
-      _$TelegramCharts.onMouseUp,
-      LISTENER_OPTIONS
-    );
-    document.addEventListener(
-      "touchmove",
-      _$TelegramCharts.onTouchMove,
-      LISTENER_OPTIONS
-    );
-    document.addEventListener(
-      "touchend",
-      _$TelegramCharts.onMouseUp,
-      LISTENER_OPTIONS
-    );
-    _$TelegramCharts.listenersActivated = true;
-  }
-};
 
 const chartedCanvasTypesList = [CANVAS_TYPES.Minimap, CANVAS_TYPES.Chart];
 
@@ -157,10 +92,18 @@ function createFloatingWindow(data, colors) {
 }
 
 function getColor(color) {
-  return COLORS[color][_$TelegramCharts.modeSwitcherData.mode];
+  return COLORS[color][WeeChart.mode];
 }
 
 export class Chart {
+  /**
+   *
+   * @param {Element} container Container, where to draw chart
+   * @param {Object} data Charts data
+   * @param {Object} params Additional params for charts
+   * @param {Number} params.w Chart width
+   * @param {Number} params.h Chart height
+   */
   constructor(container, data, params) {
     const w = params.w;
     const h = params.h;
@@ -183,15 +126,19 @@ export class Chart {
     this._forceRenderDates = true;
     this._datesCleaned = false;
     this._activeAnimations = 0;
+
     this._chart = createCanvasObject(CANVAS_TYPES.Chart, w, h);
     this._chart.height -= DATE_MARGIN;
-    this._yAxisAnimationShift = (this._chart.height / LINES_COUNT) * 3;
     this._chart.canvas.className = "chart__chart-canvas hide-selection";
     this._chart.context = this._chart.canvas.getContext("2d");
+
+    this._yAxisAnimationShift = (this._chart.height / LINES_COUNT) * 3;
+
     this._float = createCanvasObject(CANVAS_TYPES.Float, w, h);
     this._float.height -= DATE_MARGIN;
     this._float.canvas.className = "chart__float-canvas hide-selection";
     this._float.context = this._float.canvas.getContext("2d");
+
     this._minimap = createCanvasObject(CANVAS_TYPES.Minimap, w, MINIMAP_HEIGHT);
     this._minimapBackground = createCanvasObject(
       CANVAS_TYPES.MinimapBackground,
@@ -205,6 +152,7 @@ export class Chart {
     );
     this._minimap.canvas.className = "chart__minimap-canvas hide-selection";
     this._minimap.context = this._minimap.canvas.getContext("2d");
+
     this._rgbColors = {};
     this._animations = [];
     const pixelsForDot = w / this._dataCount;
@@ -330,9 +278,11 @@ export class Chart {
     this._transitions.xShift = viewShift / this._minimap.width;
     wrapper.className = "chart__minimap-wrapper";
     wrapper.style.width = `${w}px`;
+
     wrapper.appendChild(this._minimap.canvas);
     wrapper.appendChild(this._minimapBackground.canvas);
     wrapper.appendChild(dragger);
+
     fragment.appendChild(this._chart.canvas);
     fragment.appendChild(this._float.canvas);
     fragment.appendChild(this._state.floatingWindow.elem);
@@ -362,14 +312,13 @@ export class Chart {
       LISTENER_OPTIONS
     );
 
-    if (!_$TelegramCharts.listenersActivated) {
-      _$TelegramCharts.activateDragEvents();
+    if (!WeeChart.listenersActivated) {
+      WeeChart.activateDragEvents();
     }
 
-    _$TelegramCharts.touchmoveConsumers.push(this._moveDragTouchAdapter);
-    _$TelegramCharts.mouseupConsumers.push(this._endDrag);
-    _$TelegramCharts.mousemoveConsumers.push(this._moveDrag);
-    _$TelegramCharts.modeSwitcherData.updateHooks.push(this._animationLoop);
+    WeeChart.touchmoveConsumers.push(this._moveDragTouchAdapter);
+    WeeChart.mouseupConsumers.push(this._endDrag);
+    WeeChart.mousemoveConsumers.push(this._moveDrag);
 
     this._float.canvas.addEventListener(
       "mousemove",
@@ -416,6 +365,16 @@ export class Chart {
     this._render();
     this._drawMinimap();
     this._renderButtons();
+
+    WeeChart.charts.push(this);
+  }
+  /**
+   * Set night/day mode
+   * @param {"night"|"day"} mode Mode name
+   */
+  setMode(mode) {
+    this._container.classList.toggle("chart--night", mode === "night");
+    this._animationLoop();
   }
 
   _floatMoveTouchAdapter(event) {
@@ -1292,22 +1251,4 @@ export class Chart {
   }
 }
 
-function switchMode() {
-  const data = _$TelegramCharts.modeSwitcherData;
-  const modes = _$TelegramCharts.modes;
-  const isNight = data.mode === modes.Night;
-  const newMode = isNight ? modes.Day : modes.Night;
-
-  data.mode = newMode;
-  data.element.innerHTML = data.captions[newMode];
-  appElement.classList = isNight ? "app" : "app app--night";
-
-  for (let i = 0; i < data.updateHooks.length; i++) {
-    data.updateHooks[i]();
-  }
-}
-
-const switcherData = _$TelegramCharts.modeSwitcherData;
-
-switcherData.element = appElement.querySelector(".mode-switcher");
-switcherData.element.addEventListener("click", switchMode, LISTENER_OPTIONS);
+export const setMode = WeeChart.setMode;

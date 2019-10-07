@@ -27,31 +27,3 @@ body {
 .app.app--night {
   background-color: #222f3f;
 }
-
-.app--night .checkbox {
-  border-color: #304659;
-}
-
-.app--night .checkbox__title {
-  color: #e7ecee;
-}
-
-.app--night .chart__minimap-dragger {
-  border-color: #56626d;
-  box-shadow: none;
-}
-
-.app--night .chart__minimap-dragger-arrow {
-  background-color: #56626d;
-  border-color: transparent;
-}
-
-.app--night .floating-window {
-  color: #ffffff;
-  box-shadow: 0 0 1px rgba(0, 0, 0, 0.3);
-  background-color: #233242;
-}
-
-.app--night .checkbox__input:not(:checked) + .checkbox__wrapper {
-  background-color: #233242 !important;
-}
